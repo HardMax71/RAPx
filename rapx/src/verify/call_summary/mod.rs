@@ -386,7 +386,7 @@ pub(crate) fn effect_summary<'tcx>(
             }
         }
         if let Some(effect) =
-            interprocedural::try_pointer_arith_wrapper_effect(tcx, callee, Some(destination))
+            interprocedural::try_pointer_arith_wrapper_effect(tcx, callee, Some(destination), 0)
         {
             return CallEffectSummary {
                 name,

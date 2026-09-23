@@ -116,11 +116,16 @@ fn trace_to_callee_arg<'tcx>(
 
 /// Detect when a local callee wraps a pointer-arithmetic call (add/sub) and
 /// produce the correct `ReturnPointerAdd` / `ReturnPointerSub` effect.
+/// Follows nested wrappers with bounded depth.
 pub(super) fn try_pointer_arith_wrapper_effect<'tcx>(
     tcx: TyCtxt<'tcx>,
     callee: DefId,
     _destination: Option<Local>,
+    depth: usize,
 ) -> Option<CallEffect> {
+    if depth > 4 {
+        return None;
+    }
     if !tcx.is_mir_available(callee) {
         return None;
     }
@@ -154,7 +159,12 @@ pub(super) fn try_pointer_arith_wrapper_effect<'tcx>(
                 {
                     return None;
                 }
-                try_pointer_arith_wrapper_effect(tcx, inner_callee, Some(call_dest.local))
+                try_pointer_arith_wrapper_effect(
+                    tcx,
+                    inner_callee,
+                    Some(call_dest.local),
+                    depth + 1,
+                )
             })
         } else {
             None

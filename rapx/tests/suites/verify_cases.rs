@@ -314,3 +314,11 @@ fn free_list_allocator() {
     let output = run_with_args("verify_cases/free_list_allocator", CMD_VERIFY_TARGETED);
     assert_not_contain(&output, "result: UNSOUND");
 }
+
+// ================ Recursive Callee Tests ================
+#[test]
+fn self_recursive_callee() {
+    let output = run_with_args("verify_cases/self_recursive_callee", CMD_VERIFY_SCAN);
+    assert_not_contain(&output, "overflowed");
+    assert_function_result(&output, "target", "SOUND");
+}
