@@ -314,3 +314,11 @@ fn free_list_allocator() {
     let output = run_with_args("verify_cases/free_list_allocator", CMD_VERIFY_TARGETED);
     assert_not_contain(&output, "result: UNSOUND");
 }
+
+// ================ Call Chain Depth ================
+#[test]
+fn call_chain_depth() {
+    // Each callee is summarized once, not once per path that reaches it.
+    let output = run_with_args("verify_cases/call_chain_depth", CMD_VERIFY_SCAN);
+    assert_function_result(&output, "target", "SOUND");
+}

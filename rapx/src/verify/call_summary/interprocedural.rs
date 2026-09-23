@@ -4,7 +4,7 @@
 //! to approximate its effects: pointer-arithmetic wrappers, `from_raw_parts`
 //! wrappers, argument-to-return dataflow, and index-disjointness validators.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use rustc_hir::def_id::DefId;
 use rustc_middle::{
@@ -1135,10 +1135,18 @@ fn single_call_wrapper_target<'tcx>(tcx: TyCtxt<'tcx>, callee: DefId) -> Option<
 /// reachable return path. Works for any callee with available MIR, and follows
 /// wrapper calls (`Vec::push` → `push_mut`) with bounded depth.
 pub(super) fn local_must_write_args(tcx: TyCtxt<'_>, callee: DefId) -> Option<Vec<usize>> {
-    must_write_args_rec(tcx, callee, 0).map(|set| set.into_iter().collect())
+    must_write_args_rec(tcx, callee, 0, &mut HashMap::new()).map(|set| set.into_iter().collect())
 }
 
-fn must_write_args_rec(tcx: TyCtxt<'_>, callee: DefId, depth: usize) -> Option<HashSet<usize>> {
+/// Keyed by depth too, since the depth cutoff makes a deeper summary less complete.
+type MustWriteMemo = HashMap<(DefId, usize), Option<HashSet<usize>>>;
+
+fn must_write_args_rec(
+    tcx: TyCtxt<'_>,
+    callee: DefId,
+    depth: usize,
+    memo: &mut MustWriteMemo,
+) -> Option<HashSet<usize>> {
     if depth > 4 {
         return None;
     }
@@ -1148,8 +1156,11 @@ fn must_write_args_rec(tcx: TyCtxt<'_>, callee: DefId, depth: usize) -> Option<H
     if tcx.intrinsic(callee).is_some() || helpers::is_drop_in_place(callee) {
         return None;
     }
+    if let Some(summary) = memo.get(&(callee, depth)) {
+        return summary.clone();
+    }
 
-    helpers::catch_panic(|| {
+    let summary = helpers::catch_panic(|| {
         let body = tcx.optimized_mir(callee);
         let mut graph = PathGraph::new(tcx, callee);
         graph.find_scc();
@@ -1161,7 +1172,7 @@ fn must_write_args_rec(tcx: TyCtxt<'_>, callee: DefId, depth: usize) -> Option<H
             if !path_ends_in_return(body, &path) {
                 continue;
             }
-            let writes = write_args_on_path(tcx, body, &path, depth);
+            let writes = write_args_on_path(tcx, body, &path, depth, memo);
             must_write = Some(match must_write {
                 Some(current) => current.intersection(&writes).copied().collect(),
                 None => writes,
@@ -1170,7 +1181,9 @@ fn must_write_args_rec(tcx: TyCtxt<'_>, callee: DefId, depth: usize) -> Option<H
 
         must_write.unwrap_or_default()
     })
-    .ok()
+    .ok();
+    memo.insert((callee, depth), summary.clone());
+    summary
 }
 
 /// Recognize the standard-library `get_disjoint_check_valid` helper as a
@@ -1314,6 +1327,7 @@ fn write_args_on_path<'tcx>(
     body: &rustc_middle::mir::Body<'tcx>,
     path: &[usize],
     depth: usize,
+    memo: &mut MustWriteMemo,
 ) -> HashSet<usize> {
     let mut writes = HashSet::new();
     for block in path {
@@ -1355,7 +1369,7 @@ fn write_args_on_path<'tcx>(
         // Wrapper calls: a nested callee that writes its own args maps those
         // writes back onto this callee's args.
         if let Some(nested) = helpers::dep_callee_def_id(func) {
-            if let Some(nested_writes) = must_write_args_rec(tcx, nested, depth + 1) {
+            if let Some(nested_writes) = must_write_args_rec(tcx, nested, depth + 1, memo) {
                 for (i, arg) in args.iter().enumerate() {
                     if nested_writes.contains(&i) {
                         if let Some(outer) = trace_to_callee_arg(tcx, body, &arg.node) {
