@@ -454,6 +454,13 @@ fn deref_sound_cases() {
     assert_contain(&output, "result: SOUND");
 }
 
+// ================ Box Deref ================
+#[test]
+fn box_deref() {
+    let output = run_with_args("verify_units/box_deref", CMD_VERIFY_SCAN);
+    assert_function_result(&output, "f", "SOUND");
+}
+
 // ================ Typed Provenance Cases =============
 #[test]
 fn typed_provenance_cases() {
