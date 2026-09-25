@@ -648,6 +648,7 @@ impl<'a, T> Chunks<'a, T> {
 }
 
 #[rapx::invariant(InBound(v, T, v.len()))]
+#[rapx::invariant(NonNull(v))]
 #[rapx::invariant(Alive(v, 'a))]
 pub struct ChunksMut<'a, T: 'a> {
     v: *mut [T],
@@ -796,6 +797,7 @@ impl<'a, T> ChunksExact<'a, T> {
 }
 
 #[rapx::invariant(InBound(v, T, v.len()))]
+#[rapx::invariant(NonNull(v))]
 #[rapx::invariant(Alive(v, 'a))]
 pub struct ChunksExactMut<'a, T: 'a> {
     v: *mut [T],
@@ -930,6 +932,7 @@ impl<'a, T> RChunks<'a, T> {
 }
 
 #[rapx::invariant(InBound(v, T, v.len()))]
+#[rapx::invariant(NonNull(v))]
 #[rapx::invariant(Alive(v, 'a))]
 pub struct RChunksMut<'a, T: 'a> {
     v: *mut [T],
@@ -1085,6 +1088,7 @@ impl<'a, T> RChunksExact<'a, T> {
 }
 
 #[rapx::invariant(InBound(v, T, v.len()))]
+#[rapx::invariant(NonNull(v))]
 #[rapx::invariant(Alive(v, 'a))]
 pub struct RChunksExactMut<'a, T: 'a> {
     v: *mut [T],

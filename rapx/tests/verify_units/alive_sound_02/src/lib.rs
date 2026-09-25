@@ -4,6 +4,9 @@
 
 use std::marker::PhantomData;
 
+#[rapx::invariant(NonNull(ptr))]
+#[rapx::invariant(ValidPtr(ptr, T, len))]
+#[rapx::invariant(Init(ptr, T, len))]
 #[rapx::invariant(Alive(ptr, 'a))]
 pub struct MutSliceHost<'a, T> {
     ptr: *mut T,

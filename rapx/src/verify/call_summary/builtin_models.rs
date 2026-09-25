@@ -500,6 +500,13 @@ fn layout_constant_effect<'tcx>(
 ) -> Option<CallEffect> {
     let ty = layout_call_ty(func)?;
     let (align, size) = type_layout(tcx, caller, ty)?;
+    // `type_layout` reports `(0, 0)` for a generic `T` (layout unknown).  Leave
+    // that case to the VM's `try_size_align_effect`, which binds the shared
+    // symbolic `sizeof_T` / `align_T` (and keeps `align_of::<T>() >= 1`, so a
+    // cast like `align as *const T` in `NonNull::dangling` is non-null).
+    if align == 0 && size == 0 {
+        return None;
+    }
     let Some(callee) = crate::helpers::mir_utils::dep_callee_def_id(func) else {
         return None;
     };

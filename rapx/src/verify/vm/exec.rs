@@ -951,11 +951,9 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
             Some(self.align_sym(pointee))
         };
         let invariants = if is_raw_ptr {
-            ValueInvariants {
-                non_null: true,
-                init: true,
-                ..Default::default()
-            }
+            // A raw pointer carries no non-null / init / align guarantee; those
+            // facts must come from the struct's own `#[rapx::invariant]`s.
+            ValueInvariants::default()
         } else {
             ValueInvariants {
                 init: true,
@@ -4297,7 +4295,22 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
         if let Some(PropertyArg::Ty(ty)) = property.args().get(1) {
             let align = self.align_sym(*ty);
             if align.simplify().as_u64() != Some(1) {
-                val.invariants.align_n = Some(align);
+                val.invariants.align_n = Some(align.clone());
+                // For a *concrete* alignment, also record `term % align == 0` as a
+                // path condition.  `align_n` is a value invariant that pointer
+                // arithmetic (`ptr.add(n)`) drops, but the alignment fact itself
+                // persists: a downstream `Align(p, T)` on `p = ptr.add(n)` can then
+                // combine `term % align == 0` with the `n % align == 0` mask fact to
+                // prove `p % align == 0`.  (A symbolic `align_T` is skipped — the
+                // non-linear `% align_T` is not decidable, so `align_n` alone is
+                // used for that case.)
+                if align.simplify().as_u64().is_some() {
+                    self.path_conditions.push(
+                        val.term
+                            .rem(&align)
+                            ._eq(&Int::from_u64(self.ctx, 0)),
+                    );
+                }
             }
         }
         self.set_contract_target_value(property, val);

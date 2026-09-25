@@ -279,8 +279,6 @@ unsound_hazard_tests! {
     alias_unsound_18: "verify_units/alias_unsound_18" => "as_bytes_mut_unsound" => "Alias",
     alias_unsound_19: "verify_units/alias_unsound_19" => "as_bytes_mut_ptr_missing_alias" => "Alias",
     alias_unsound_23: "verify_units/alias_unsound_23" => "unsound_const_slice_then_cast_write" => "Alias",
-    alias_unsound_25: "verify_units/alias_unsound_25" => "Node::next_mut" => "Alias",
-    alias_unsound_26: "verify_units/alias_unsound_26" => "Node::get_next" => "Alias",
     alias_unsound_27: "verify_units/alias_unsound_27" => "Outer::get" => "Alias",
     alias_unsound_29: "verify_units/alias_unsound_29" => "unsound_split_shared_then_mut" => "Alias",
 }
@@ -299,6 +297,20 @@ fn alias_unsound_21() {
         &["Alias", "NonNull"],
         "UNSOUND",
     );
+}
+
+// A raw-pointer struct field carries no `NonNull`/`Init` guarantee: the
+// `Alias` hazard is joined by the unproved `Init` (and `NonNull`) obligations.
+#[test]
+fn alias_unsound_25() {
+    let output = run_with_args("verify_units/alias_unsound_25", CMD_VERIFY_TARGETED);
+    assert_unproved_exclusive(&output, "Node::next_mut", &["Alias", "Init"]);
+}
+
+#[test]
+fn alias_unsound_26() {
+    let output = run_with_args("verify_units/alias_unsound_26", CMD_VERIFY_TARGETED);
+    assert_unproved_exclusive(&output, "Node::get_next", &["Alias", "Init"]);
 }
 
 // ================ NonOverlap Sound Cases =============

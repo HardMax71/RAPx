@@ -16,6 +16,7 @@ use std::slice;
 
 /// `*mut T` but non-zero and hence covariant; `#[repr(transparent)]` over a `*const T`.
 #[repr(transparent)]
+#[rapx::invariant(NonNull(pointer))]
 struct NonNull<T: ?Sized> {
     pointer: *const T,
 }

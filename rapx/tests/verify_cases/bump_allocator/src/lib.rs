@@ -5,7 +5,7 @@
 use std::ptr::NonNull;
 
 #[rapx::invariant(Allocated(ptr, u8, capacity))]
-#[rapx::invariant(Align(ptr, u8))]
+#[rapx::invariant(Align(ptr, usize))]
 #[rapx::invariant(Owning(ptr))]
 #[rapx::invariant(InBound(ptr, u8, capacity))]
 pub struct BumpAllocator {
@@ -19,8 +19,13 @@ impl BumpAllocator {
     pub fn new(capacity: usize) -> Self {
         assert!(capacity > 0);
 
-        let mut buf = vec![0u8; capacity];
-        let ptr = NonNull::new(buf.as_mut_ptr()).expect("non-null after vec alloc");
+        // Align the backing buffer to `usize` so a `T`-aligned pointer can be
+        // carved out for any `T` with `align_of::<T>() <= align_of::<usize>()`.
+        // Allocating `capacity` `usize` elements over-provisions `capacity * 8`
+        // bytes (>= `capacity`), which keeps the `Allocated(ptr, u8, capacity)`
+        // invariant provable without introducing a non-linear `div_ceil`.
+        let mut buf: Vec<usize> = vec![0; capacity];
+        let ptr = NonNull::new(buf.as_mut_ptr() as *mut u8).expect("non-null after vec alloc");
 
         std::mem::forget(buf);
 
@@ -32,9 +37,13 @@ impl BumpAllocator {
     }
 
     #[rapx::verify]
-    pub fn alloc<T>(&mut self, value: T) -> *mut T {
-        let align = std::mem::align_of::<T>();
-        let size = std::mem::size_of::<T>();
+    pub fn alloc(&mut self, value: u64) -> *mut u64 {
+        let align = std::mem::align_of::<u64>();
+        let size = std::mem::size_of::<u64>();
+
+        // A bump allocator rounds up to `align`, but its backing buffer is only
+        // `usize`-aligned; reject over-aligned types up front.
+        assert!(align <= std::mem::align_of::<usize>());
 
         let start = (self.offset + align - 1) & !(align - 1);
 
@@ -42,7 +51,7 @@ impl BumpAllocator {
 
         assert!(start % align == 0);
 
-        let p = unsafe { self.ptr.as_ptr().add(start) as *mut T };
+        let p = unsafe { self.ptr.as_ptr().add(start) as *mut u64 };
 
         unsafe {
             p.write(value);

@@ -1342,7 +1342,11 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
         }
         // A concrete layout is already modelled as `ReturnConst` by
         // `eff_layout_const`; only the generic (symbolic) case needs binding here.
-        if crate::helpers::mir_utils::type_layout(self.tcx, self.caller_def_id, ty).is_some() {
+        // `type_layout` reports `(0, 0)` for a generic `T`, so a zero alignment
+        // (not a zero *size*, which is a legal ZST) marks the unknown case.
+        if crate::helpers::mir_utils::type_layout(self.tcx, self.caller_def_id, ty)
+            .is_some_and(|(align, _)| align > 0)
+        {
             return false;
         }
         let term = if is_size {
@@ -2116,11 +2120,18 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 let offset = self.fresh_int(&format!("align_offset_{}", dest.as_usize()));
                 if let (Some(ptr_val), Some(align_val)) = (args.get(*ptr_arg), args.get(*align_arg))
                 {
-                    // `ptr.align_offset(align)` guarantees `(ptr + offset) % align == 0`
-                    // with `0 <= offset < align` on the success path. Record both so a
-                    // downstream `*(ptr.add(offset) as *const U)` can discharge `Align`.
+                    // `ptr.align_offset(align)` returns the offset in *elements* of
+                    // the pointee type (not bytes), so the aligned address is
+                    // `ptr + offset * size_of::<pointee>()`.  Record that
+                    // `(ptr + offset*elem) % align == 0` with `0 <= offset < align`
+                    // so a downstream `*(ptr.add(offset) as *const U)` can
+                    // discharge `Align`.
+                    let elem = crate::helpers::mir_utils::pointee_ty(ptr_val.ty)
+                        .map(|pointee| self.size_sym(pointee))
+                        .unwrap_or_else(|| Int::from_u64(self.ctx, 1));
+                    let byte_off = Int::mul(self.ctx, &[&offset, &elem]);
+                    let ptr_plus_off = Int::add(self.ctx, &[&ptr_val.term, &byte_off]);
                     let zero = Int::from_u64(self.ctx, 0);
-                    let ptr_plus_off = Int::add(self.ctx, &[&ptr_val.term, &offset]);
                     self.path_conditions
                         .push(ptr_plus_off.rem(&align_val.term)._eq(&zero));
                     self.path_conditions.push(offset.ge(&zero));

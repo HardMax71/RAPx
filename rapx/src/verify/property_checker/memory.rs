@@ -118,10 +118,14 @@ impl PropertyChecker {
             solver.assert(&known_align.lt(&align));
             let r = solver.check();
             solver.pop(1);
-            match r {
-                SatResult::Unsat => return CheckResult::ProvedBySmt,
-                SatResult::Sat => return CheckResult::Failed,
-                _ => {}
+            // `align_n` is only a *lower bound* on the value's alignment: even
+            // when `align_n >= align` is satisfiable (not implied), the pointer
+            // may still be `align`-aligned through a separate path condition
+            // (e.g. `ptr.align_offset(align)` guarantees
+            // `(ptr + off*elem) % align == 0`).  Fall through to the full
+            // modulo query rather than reporting `Failed` prematurely.
+            if matches!(r, SatResult::Unsat) {
+                return CheckResult::ProvedBySmt;
             }
         }
         // Check allocation base alignment with concrete offset

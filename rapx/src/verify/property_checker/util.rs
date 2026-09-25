@@ -295,8 +295,18 @@ impl PropertyChecker {
         };
         match val {
             Some(v) => {
-                if v.provenance.is_none() && !v.invariants.non_null {
-                    return true;
+                // A pointer without a `non_null` fact is possibly null: either it
+                // carries no provenance, or its provenance is an external
+                // placeholder (a raw-pointer field/param), which does not imply
+                // non-nullness.
+                if !v.invariants.non_null {
+                    let possibly_null = match &v.provenance {
+                        None => true,
+                        Some(prov) => vm_state.alloc(prov.alloc_id).is_external(),
+                    };
+                    if possibly_null {
+                        return true;
+                    }
                 }
                 if let Some(term_zero) = v.term.simplify().as_u64() {
                     if term_zero == 0 {
