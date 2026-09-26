@@ -9,7 +9,7 @@ use crate::helpers::mir_scan::Checkpoint;
 use crate::verify::api_classify;
 use crate::verify::contract::{ContractExpr, Property, PropertyArg};
 use crate::verify::report::CheckResult;
-use crate::verify::vm::state::{AllocId, VmState, VmValue};
+use crate::verify::vm::state::{AllocId, Liveness, VmState, VmValue};
 use rustc_hash::FxHashSet;
 use rustc_middle::mir::{Local, Operand, Rvalue, StatementKind};
 use rustc_middle::ty::TyKind;
@@ -918,8 +918,38 @@ impl PropertyChecker {
             // memory (raw-pointer params/fields) and carries no liveness
             // guarantee; it is alive only if explicitly assumed (`Alive`
             // precondition / struct invariant), or grounded in a live reference.
-            if vm_state.alloc(root_id).alive_assumed && !vm_state.alloc(root_id).dead {
-                return CheckResult::ProvedByRule;
+            if !vm_state.alloc(root_id).dead {
+                match &vm_state.alloc(root_id).liveness {
+                    Liveness::Assumed => return CheckResult::ProvedByRule,
+                    Liveness::AssumedFor(src_region) => {
+                        // The `Alive(p, 'r)` check demands the memory alive for
+                        // `'r`, while the assumption only guarantees `'a`; the
+                        // assumption covers the demand only when `'a: 'r`.
+                        let check_region = property.args().get(1).and_then(|a| {
+                            if let PropertyArg::Ident(name) = a {
+                                crate::verify::vm::region::resolve_region_name(
+                                    vm_state.tcx,
+                                    checkpoint.caller,
+                                    name,
+                                )
+                            } else {
+                                None
+                            }
+                        });
+                        if let Some(r) = check_region {
+                            if !crate::verify::vm::region::region_outlives(
+                                vm_state.tcx,
+                                checkpoint.caller,
+                                *src_region,
+                                r,
+                            ) {
+                                return CheckResult::Failed;
+                            }
+                        }
+                        return CheckResult::ProvedByRule;
+                    }
+                    Liveness::Unknown => {}
+                }
             }
             // A raw pointer derived from a live reference or owned (Box/Vec)
             // parameter is alive: the reference / ownership guarantees liveness.

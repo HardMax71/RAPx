@@ -359,6 +359,18 @@ pub(crate) fn check_alias_vm<'ctx, 'tcx>(
                                     );
                                 }
                             }
+                        } else if root >= 1 && root <= vm_state.body.arg_count {
+                            // A direct shared-reference parameter whose view
+                            // escapes to the return must not claim a region that
+                            // outlives its own (e.g. returning a `&'b str` as
+                            // `&'a str` when `'a: 'b`).
+                            if let Some(reason) = escape_region_violation(
+                                vm_state.tcx,
+                                checkpoint.caller,
+                                root,
+                            ) {
+                                return VmAliasResult::Failed(reason);
+                            }
                         }
                     }
                     return VmAliasResult::Proved;
@@ -580,7 +592,19 @@ fn check_view_alias<'ctx, 'tcx>(
     if let Some(origin) = vm_state.resolve_origin(&origin_val) {
         match (kind, origin.kind) {
             (HazardKind::UniqueView, VmOriginKind::MutRef) => return VmAliasResult::Proved,
-            (HazardKind::SharedView, VmOriginKind::SharedRef) => return VmAliasResult::Proved,
+            (HazardKind::SharedView, VmOriginKind::SharedRef) => {
+                // Aliasing-safe, but if the view escapes to the return, its
+                // claimed region must not outlive the source reference's region.
+                if let Some(reason) = shared_view_escape_region_violation(
+                    tcx,
+                    caller,
+                    destination,
+                    origin.local.as_usize(),
+                ) {
+                    return VmAliasResult::Failed(reason);
+                }
+                return VmAliasResult::Proved;
+            }
             (HazardKind::UniqueView, VmOriginKind::SharedRef) => {
                 // `&T` → `&mut T` violates shared-XOR-mutable regardless of
                 // field encapsulation: the caller can re-enter the method and
@@ -693,6 +717,13 @@ fn check_view_alias<'ctx, 'tcx>(
                     &PlaceKey::from_origin(local, vec![]),
                 )
             {
+                // The returned reference must not claim a region that outlives
+                // the source reference's region: a shared view re-borrowed from
+                // `&'b str` cannot be returned as `&'a str` when `'a: 'b` (the
+                // source is only valid for the shorter `'b`).
+                if let Some(reason) = escape_region_violation(tcx, caller, local) {
+                    return VmAliasResult::Failed(reason);
+                }
                 return VmAliasResult::Proved;
             }
         }
@@ -736,6 +767,52 @@ fn check_view_alias<'ctx, 'tcx>(
 
     // Conservatively proved (origin traced to safe type or no conflicts found)
     VmAliasResult::Proved
+}
+
+/// A shared view re-borrowed from the reference parameter `local` and returned
+/// must not claim a region that outlives the parameter's own region. Returns a
+/// violation reason when `local`'s region does not outlive the return region.
+fn shared_view_escape_region_violation(
+    tcx: rustc_middle::ty::TyCtxt<'_>,
+    caller: DefId,
+    destination: Option<Local>,
+    local: usize,
+) -> Option<String> {
+    if !alias_hazard::destination_flows_to_return(tcx, caller, destination) {
+        return None;
+    }
+    escape_region_violation(tcx, caller, local)
+}
+
+/// Check whether the shared view's claimed return region outlives the source
+/// reference `local`'s region. Returns a violation reason when it does.
+fn escape_region_violation(
+    tcx: rustc_middle::ty::TyCtxt<'_>,
+    caller: DefId,
+    local: usize,
+) -> Option<String> {
+    // MIR `local_decls` erases lifetime regions (`ReErased`), so take the
+    // precise regions from the function signature instead.
+    let fn_sig = tcx.fn_sig(caller);
+    let inst = fn_sig.instantiate_identity();
+    #[cfg(rapx_ge_99)]
+    let inst = inst.skip_norm_wip();
+    let src = inst.input(local - 1);
+    let ret = inst.output();
+    let (
+        rustc_middle::ty::TyKind::Ref(src_region, _, _),
+        rustc_middle::ty::TyKind::Ref(ret_region, _, _),
+    ) = (src.skip_binder().kind(), ret.skip_binder().kind())
+    else {
+        // Not a reference-to-reference return: nothing to check.
+        return None;
+    };
+    if !super::region::region_outlives(tcx, caller, *src_region, *ret_region) {
+        return Some(format!(
+            "returned region `{ret_region:?}` outlives the source reference's region `{src_region:?}`"
+        ));
+    }
+    None
 }
 
 /// Attempt to extract the MIR local index from an operand for PlaceKey construction.

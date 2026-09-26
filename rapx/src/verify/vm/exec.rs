@@ -24,7 +24,9 @@ use crate::{
     },
 };
 
-use super::state::{AllocId, ContentTy, InlineFrame, Provenance, ValueInvariants, VmState, VmValue};
+use super::state::{
+    AllocId, ContentTy, InlineFrame, Liveness, Provenance, ValueInvariants, VmState, VmValue,
+};
 
 use crate::verify::api_classify;
 
@@ -578,7 +580,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                                             Some(*elem_ty),
                                         );
                                         self.alloc_mut(data_alloc_id).initialized = true;
-                                        self.alloc_mut(data_alloc_id).alive_assumed = true;
+                                        self.alloc_mut(data_alloc_id).liveness = Liveness::Assumed;
                                         self.set_field_value(
                                             local,
                                             vec![idx],
@@ -607,7 +609,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                                             Some(*pointee),
                                         );
                                         self.alloc_mut(field_alloc_id).initialized = true;
-                                        self.alloc_mut(field_alloc_id).alive_assumed = true;
+                                        self.alloc_mut(field_alloc_id).liveness = Liveness::Assumed;
                                         self.set_field_value(
                                             local,
                                             vec![idx],
@@ -3638,7 +3640,21 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
             }
             PropertyKind::Alive => {
                 if let Some(id) = self.contract_alloc_id_field_aware(property) {
-                    self.alloc_mut(id).alive_assumed = true;
+                    let region = property.args().get(1).and_then(|a| {
+                        if let PropertyArg::Ident(name) = a {
+                            crate::verify::vm::region::resolve_region_name(
+                                self.tcx,
+                                self.caller_def_id,
+                                name,
+                            )
+                        } else {
+                            None
+                        }
+                    });
+                    self.alloc_mut(id).liveness = match region {
+                        Some(r) => Liveness::AssumedFor(r),
+                        None => Liveness::Assumed,
+                    };
                 }
             }
             PropertyKind::InBound => {
@@ -3716,7 +3732,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 });
                 if let Some(id) = id {
                     self.alloc_mut(id).dead = false;
-                    self.alloc_mut(id).alive_assumed = true;
+                    self.alloc_mut(id).liveness = Liveness::Assumed;
                     self.alloc_mut(id).initialized = true;
                     self.alloc_mut(id).nul_terminated = true;
                     // `ValidCStr(p, n)` carries the byte length of the
@@ -4766,7 +4782,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                         self.alloc_mut(alloc_id).initialized = true;
                         // A const/static byte materialization lives for the
                         // whole program (`'static`), so it is always alive.
-                        self.alloc_mut(alloc_id).alive_assumed = true;
+                        self.alloc_mut(alloc_id).liveness = Liveness::Assumed;
                         for (i, &b) in bytes.iter().enumerate() {
                             self.record_byte_value(
                                 alloc_id,

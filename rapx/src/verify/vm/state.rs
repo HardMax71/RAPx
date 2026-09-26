@@ -7,7 +7,7 @@
 use rustc_hir::def_id::DefId;
 use rustc_middle::{
     mir::{BasicBlock, Body, Local, Operand, Place, ProjectionElem},
-    ty::{Ty, TyCtxt},
+    ty::{Region, Ty, TyCtxt},
 };
 use z3::{
     Context,
@@ -157,6 +157,20 @@ impl<'tcx> From<Option<Ty<'tcx>>> for ContentTy<'tcx> {
     }
 }
 
+/// How an allocation's liveness is established, and for which region.
+#[derive(Clone, Debug)]
+pub(crate) enum Liveness<'tcx> {
+    /// No liveness assumption. A VM-owned allocation is still alive while
+    /// `!dead`; an external allocation with no assumption has unknown liveness
+    /// (and fails `Alive` unless grounded in a live reference).
+    Unknown,
+    /// Assumed alive for the function's whole execution region (a reference's
+    /// referent, `ValidCStr`, `'static` data, or `Alive(p)` with no lifetime).
+    Assumed,
+    /// Assumed alive for the named region (an `Alive(p, 'a)` contract/invariant).
+    AssumedFor(Region<'tcx>),
+}
+
 /// A memory allocation (stack or heap).
 ///
 /// The allocation is stored in `VmState::allocations` at index `AllocId.0`
@@ -182,11 +196,17 @@ pub(crate) struct Allocation<'ctx, 'tcx> {
     /// Allocations that have been freed (StorageDead, Drop).
     pub dead: bool,
 
-    /// Allocations that have been written to (initialized via write/MaybeUninit).
+    /// Allocations whose contents hold an initialized (readable) value: a heap
+    /// constructor (`Box::new`, `Vec`), a reference parameter's referent, a
+    /// callee return, or a `write`. Stays `false` for uninitialized memory
+    /// (`Box::new_uninit`, `MaybeUninit::uninit`).
     pub initialized: bool,
 
-    /// Allocations assumed alive via contract (e.g. `#[rapx::requires(Alive(ptr))]`).
-    pub alive_assumed: bool,
+    /// How this allocation's liveness is established, and for which region.
+    /// Only consulted for external allocations, whose liveness `dead` cannot
+    /// track; `AssumedFor('a)` records the `Alive(p, 'a)` contract's region so
+    /// the checker can reject a use that demands a longer region.
+    pub liveness: Liveness<'tcx>,
 
     /// Allocations known to be a null-terminated byte buffer (a valid C
     /// string), asserted via a `ValidCStr` contract fact or struct invariant.
@@ -229,7 +249,7 @@ impl<'ctx, 'tcx> Allocation<'ctx, 'tcx> {
             kind,
             dead: false,
             initialized: false,
-            alive_assumed: false,
+            liveness: Liveness::Unknown,
             nul_terminated: false,
             parent: None,
             slice_data: None,

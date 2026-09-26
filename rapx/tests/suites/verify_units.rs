@@ -313,6 +313,16 @@ fn alive_sound_03() {
     assert_contain(&output, "Alive | Proved");
 }
 
+// A caller holding `Alive(ptr, 'a)` that calls a callee requiring
+// `Alive(ptr, 'b)` with `'a: 'b` is a lifetime narrowing: the longer `'a`
+// assumption covers the shorter `'b` demand, so `Alive` is proved.
+#[test]
+fn alive_sound_04() {
+    let output = run_with_args("verify_units/alive_sound_04", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: narrow");
+    assert_contain(&output, "Alive | Proved");
+}
+
 // ================ Alive Unsound Cases =============
 unsound_weak_tests! {
     alive_unsound_01: "verify_units/alive_unsound_01" => "DangerousAliaser::<'a, T>::get_mut" => "Alive",
@@ -320,11 +330,20 @@ unsound_weak_tests! {
     alive_unsound_03: "verify_units/alive_unsound_03" => "static_slice_from_local_vec" => "Alive",
 }
 
-// Regression: `Alive` on a raw-pointer field must NOT be proved from the struct
-// parameter alone — a raw pointer field has no liveness guarantee unless the
-// struct declares an `Alive`/`Allocated` invariant on it.
-unsound_tests! {
+// A safe method exposing a raw-pointer field without an `Alive` invariant:
+// `Alive(h.ptr)` (and the `Alias`/`ValidPtr`/`Align` parts that also lack
+// invariants) cannot be proved.
+unsound_weak_tests! {
     alive_unsound_04: "verify_units/alive_unsound_04" => "use_after_free" => "Alive",
+}
+
+// A caller with `Alive(ptr, 'a)` calling a callee that requires
+// `Alive(ptr, 'static)` is a lifetime widening — the returned reference claims
+// a longer region than the source guarantees. `Alive` fails with no
+// use-after-free (the memory is never freed).
+unsound_weak_tests! {
+    alive_unsound_05: "verify_units/alive_unsound_05" => "widen" => "Alive",
+    alive_unsound_06: "verify_units/alive_unsound_06" => "widen" => "Alive",
 }
 
 // ================ Alias Sound Cases =============
@@ -345,6 +364,9 @@ sound_tests! {
     alias_sound_14: "verify_units/alias_sound_14" => "as_bytes_sound",
     alias_sound_15: "verify_units/alias_sound_15" => "sound_split_shared_dead_then_mut",
     alias_sound_16: "verify_units/alias_sound_16" => "sound_two_independent_fields",
+    // A shared view re-borrowed from `x: &'a str` and returned as `&'a str`
+    // keeps the same region, so the escape is lifetime-safe.
+    lifetime_escape_sound_01: "verify_units/lifetime_escape_sound_01" => "return_longer",
 }
 
 // ================ Alias Unsound Cases =============
@@ -360,6 +382,10 @@ unsound_hazard_tests! {
     alias_unsound_23: "verify_units/alias_unsound_23" => "unsound_const_slice_then_cast_write" => "Alias",
     alias_unsound_27: "verify_units/alias_unsound_27" => "Outer::get" => "Alias",
     alias_unsound_29: "verify_units/alias_unsound_29" => "unsound_split_shared_then_mut" => "Alias",
+    // Re-borrowing `y: &'b str` and returning it as `&'a str` (`'a: 'b`)
+    // claims a region longer than the source's: the returned region outlives
+    // the source reference's region, so the escape is a lifetime violation.
+    lifetime_escape_unsound_01: "verify_units/lifetime_escape_unsound_01" => "return_shorter_as_longer" => "Alias",
 }
 
 // An *independent* `*mut T` must be assumed to alias the shared `&[T]`

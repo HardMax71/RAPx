@@ -237,6 +237,17 @@ fn strip_lifetime_ticks(s: &str) -> String {
                 }
             }
             '\'' => {
+                // `'static` is a Rust keyword, so it cannot be parsed as a
+                // plain ident after the tick is stripped. Map it to a
+                // non-keyword token that `resolve_region_name` recognises.
+                let rest: String = chars[i + 1..].iter().collect();
+                if rest.starts_with("static")
+                    && chars.get(i + 1 + "static".len()).is_none_or(|&c| !c.is_ascii_alphanumeric() && c != '_')
+                {
+                    out.push_str("static_lifetime");
+                    i += 1 + "static".len();
+                    continue;
+                }
                 let char_literal = match chars.get(i + 1) {
                     Some('\\') => chars.get(i + 3) == Some(&'\''),
                     Some(_) => chars.get(i + 2) == Some(&'\''),
