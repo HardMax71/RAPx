@@ -1,62 +1,14 @@
 
-// ================ Align Unsound Cases =============
-unsound_tests! {
-    align_unsound_01: "verify_units/align_unsound_1"  => "unsound_enum_paths_inside_scc" => "Align",
-    align_unsound_02: "verify_units/align_unsound_2"  => "unsound_scc_selects_mixed_source" => "Align",
-    align_unsound_03: "verify_units/align_unsound_3"  => "unsound_scc_computes_misaligned_offset" => "Align",
-    align_unsound_04: "verify_units/align_unsound_4"  => "unsound_nested_scc_controller" => "Align",
-    align_unsound_05: "verify_units/align_unsound_5"  => "unsound_iteration_count_can_leave_unaligned" => "Align",
-    align_unsound_06: "verify_units/align_unsound_6"  => "unsound_pre_scc_guard_overwritten_by_scc" => "Align",
-    align_unsound_07: "verify_units/align_unsound_7"  => "unsound_scc_guard_only_on_one_branch" => "Align",
-    align_unsound_08: "verify_units/align_unsound_8"  => "unsound_helper_with_disjunctive_guard" => "Align",
-    align_unsound_09: "verify_units/align_unsound_9"  => "unsound_helper_return_path_selects_bad_ptr" => "Align",
-    align_unsound_10: "verify_units/align_unsound_10" => "unsound_multi_hop_missing_offset_guard" => "Align",
-    align_unsound_11: "verify_units/align_unsound_11" => "unsound_sub_missing_guard" => "Align",
-    align_unsound_12: "verify_units/align_unsound_12" => "unsound_byte_offset_one" => "Align",
-    align_unsound_13: "verify_units/align_unsound_13" => "unsound_usize_add_missing_offset_guard" => "Align",
-    align_unsound_14: "verify_units/align_unsound_14" => "unsound_repr_packed_field" => "Align",
-    align_unsound_15: "verify_units/align_unsound_15" => "unsound_four_phase_scc_alignment" => "Align",
-    align_unsound_16: "verify_units/align_unsound_16" => "unsound_trait_bound_cross_cast" => "Align",
-    align_unsound_17: "verify_units/align_unsound_17" => "unsound_contract_type_param_binds_generic" => "Align",
-    align_unsound_18: "verify_units/align_unsound_18" => "unsound_unbounded_generic_cross_cast" => "Align",
-}
-
-// ================ ValidCStr Sound Cases =============
-sound_tests! {
-    validcstring_std_sound_01: "verify_units/validcstring_std_sound_01" => "sound_literal_bytes_with_nul",
-    validcstring_std_sound_02: "verify_units/validcstring_std_sound_02" => "sound_variable_bytes_with_guard",
-    validcstring_std_sound_03: "verify_units/validcstring_std_sound_03" => "sound_static_from_ptr",
-    validcstring_std_sound_04: "verify_units/validcstring_std_sound_04" => "sound_branch_selects_valid_source",
-    validcstring_std_sound_05: "verify_units/validcstring_std_sound_05" => "sound_input_slice_exact_match",
-    validcstring_std_sound_06: "verify_units/validcstring_std_sound_06" => "sound_vec_with_nul_from_variables",
-    validcstring_std_sound_07: "verify_units/validcstring_std_sound_07" => "sound_loop_builds_valid_c_string",
-    validcstring_std_sound_08: "verify_units/validcstring_std_sound_08" => "sound_from_ptr_suffix_after_add",
-    validcstring_std_sound_09: "verify_units/validcstring_std_sound_subslice" => "sound_subslice_cstr",
-}
-
-// ================ ValidCStr Unsound Cases =============
-unsound_tests! {
-    validcstring_std_unsound_01: "verify_units/validcstring_std_unsound_01" => "unsound_bytes_without_nul" => "ValidCStr",
-    validcstring_std_unsound_02: "verify_units/validcstring_std_unsound_02" => "unsound_bytes_with_interior_nul" => "ValidCStr",
-    validcstring_std_unsound_03: "verify_units/validcstring_std_unsound_03" => "unsound_static_from_ptr_without_nul" => "ValidCStr",
-    validcstring_std_unsound_04: "verify_units/validcstring_std_unsound_04" => "unsound_branch_mixes_valid_and_invalid" => "ValidCStr",
-    validcstring_std_unsound_05: "verify_units/validcstring_std_unsound_05" => "unsound_input_slice_only_checks_last_nul" => "ValidCStr",
-    validcstring_std_unsound_06: "verify_units/validcstring_std_unsound_06" => "unsound_vec_with_variable_interior_nul" => "ValidCStr",
-    validcstring_std_unsound_07: "verify_units/validcstring_std_unsound_07" => "unsound_loop_writes_interior_nul" => "ValidCStr",
-    validcstring_std_unsound_08: "verify_units/validcstring_std_unsound_08" => "unsound_nested_scc_switches_to_invalid" => "ValidCStr",
-    validcstring_std_unsound_10: "verify_units/validcstring_std_unsound_subslice" => "unsound_subslice_cstr" => "ValidCStr",
-}
-
-// ================ ValidString Sound Cases =============
-sound_tests! {
-    validstring_std_sound_01: "verify_units/validstring_std_sound_01" => "sound_valid_utf8_literal",
-    string_as_ptr_sound_01: "verify_units/string_as_ptr_sound_01" => "sound_string_as_ptr",
-}
-
-// ================ ValidString Unsound Cases =============
-unsound_tests! {
-    validstring_std_unsound_01: "verify_units/validstring_std_unsound_01" => "unsound_invalid_utf8_literal" => "ValidString",
-}
+// ============================================================
+// Property-oriented verify units.
+//
+// Each property block lists its SOUND cases first, then its UNSOUND
+// cases.  Sound cases assert `result: SOUND`; unsound cases assert
+// that the named property is unproved — either *exclusively*
+// (`unsound_tests!` / `unsound_hazard_tests!`, the failing property is
+// the only one) or *weakly* (`unsound_weak_tests!`, the failing set may
+// cascade and only the primary property is pinned).
+// ============================================================
 
 // ================ Align Sound Cases =============
 sound_tests! {
@@ -88,24 +40,26 @@ sound_tests! {
     align_sound_26: "verify_units/align_sound_26" => "sound_contract_type_param_binds_generic",
 }
 
-// ================ NonNull Sound Cases =============
-sound_tests! {
-    nonnull_sound_02: "verify_units/nonnull_sound_2" => "sound_slice_as_ptr_branch",
-    nonnull_sound_03: "verify_units/nonnull_sound_3" => "sound_intra_helper_from_ref",
-    nonnull_sound_04: "verify_units/nonnull_sound_4" => "sound_scc_unrelated_state",
-    nonnull_sound_05: "verify_units/nonnull_sound_5" => "sound_raw_arg_guarded",
-    nonnull_sound_06: "verify_units/nonnull_sound_6" => "sound_nonnull_wrapper_from_ref",
-    nonnull_sound_07: "verify_units/nonnull_sound_7" => "sound_ref_cast_copy_chain",
-}
-
-// ================ NonNull Unsound Cases =============
+// ================ Align Unsound Cases =============
 unsound_tests! {
-    nonnull_unsound_01: "verify_units/nonnull_unsound_1" => "unsound_explicit_null_constant" => "NonNull",
-    nonnull_unsound_02: "verify_units/nonnull_unsound_2" => "unsound_raw_pointer_argument" => "NonNull",
-    nonnull_unsound_03: "verify_units/nonnull_unsound_3" => "unsound_branch_selects_null" => "NonNull",
-    nonnull_unsound_04: "verify_units/nonnull_unsound_4" => "unsound_scc_overwrites_with_null" => "NonNull",
-    nonnull_unsound_05: "verify_units/nonnull_unsound_5" => "unsound_unrelated_guard" => "NonNull",
-    nonnull_unsound_06: "verify_units/nonnull_unsound_6" => "unsound_nonnull_wrapper_from_null" => "NonNull",
+    align_unsound_01: "verify_units/align_unsound_1"  => "unsound_enum_paths_inside_scc" => "Align",
+    align_unsound_02: "verify_units/align_unsound_2"  => "unsound_scc_selects_mixed_source" => "Align",
+    align_unsound_03: "verify_units/align_unsound_3"  => "unsound_scc_computes_misaligned_offset" => "Align",
+    align_unsound_04: "verify_units/align_unsound_4"  => "unsound_nested_scc_controller" => "Align",
+    align_unsound_05: "verify_units/align_unsound_5"  => "unsound_iteration_count_can_leave_unaligned" => "Align",
+    align_unsound_06: "verify_units/align_unsound_6"  => "unsound_pre_scc_guard_overwritten_by_scc" => "Align",
+    align_unsound_07: "verify_units/align_unsound_7"  => "unsound_scc_guard_only_on_one_branch" => "Align",
+    align_unsound_08: "verify_units/align_unsound_8"  => "unsound_helper_with_disjunctive_guard" => "Align",
+    align_unsound_09: "verify_units/align_unsound_9"  => "unsound_helper_return_path_selects_bad_ptr" => "Align",
+    align_unsound_10: "verify_units/align_unsound_10" => "unsound_multi_hop_missing_offset_guard" => "Align",
+    align_unsound_11: "verify_units/align_unsound_11" => "unsound_sub_missing_guard" => "Align",
+    align_unsound_12: "verify_units/align_unsound_12" => "unsound_byte_offset_one" => "Align",
+    align_unsound_13: "verify_units/align_unsound_13" => "unsound_usize_add_missing_offset_guard" => "Align",
+    align_unsound_14: "verify_units/align_unsound_14" => "unsound_repr_packed_field" => "Align",
+    align_unsound_15: "verify_units/align_unsound_15" => "unsound_four_phase_scc_alignment" => "Align",
+    align_unsound_16: "verify_units/align_unsound_16" => "unsound_trait_bound_cross_cast" => "Align",
+    align_unsound_17: "verify_units/align_unsound_17" => "unsound_contract_type_param_binds_generic" => "Align",
+    align_unsound_18: "verify_units/align_unsound_18" => "unsound_unbounded_generic_cross_cast" => "Align",
 }
 
 // ================ Allocated Sound Cases =============
@@ -133,6 +87,68 @@ unsound_tests! {
     allocated_unsound_09: "verify_units/allocated_unsound_9"  => "unsound_intra_returns_dangling_pointer" => "Allocated",
     allocated_unsound_10: "verify_units/allocated_unsound_10" => "unsound_scc_selects_dead_temporary" => "Allocated",
     allocated_unsound_11: "verify_units/allocated_unsound_11" => "unsound_adjacent_stack_objects_do_not_merge" => "Allocated",
+}
+
+// ================ NonNull Sound Cases =============
+sound_tests! {
+    nonnull_sound_02: "verify_units/nonnull_sound_2" => "sound_slice_as_ptr_branch",
+    nonnull_sound_03: "verify_units/nonnull_sound_3" => "sound_intra_helper_from_ref",
+    nonnull_sound_04: "verify_units/nonnull_sound_4" => "sound_scc_unrelated_state",
+    nonnull_sound_05: "verify_units/nonnull_sound_5" => "sound_raw_arg_guarded",
+    nonnull_sound_06: "verify_units/nonnull_sound_6" => "sound_nonnull_wrapper_from_ref",
+    nonnull_sound_07: "verify_units/nonnull_sound_7" => "sound_ref_cast_copy_chain",
+}
+
+// ================ NonNull Unsound Cases =============
+unsound_tests! {
+    nonnull_unsound_01: "verify_units/nonnull_unsound_1" => "unsound_explicit_null_constant" => "NonNull",
+    nonnull_unsound_02: "verify_units/nonnull_unsound_2" => "unsound_raw_pointer_argument" => "NonNull",
+    nonnull_unsound_03: "verify_units/nonnull_unsound_3" => "unsound_branch_selects_null" => "NonNull",
+    nonnull_unsound_04: "verify_units/nonnull_unsound_4" => "unsound_scc_overwrites_with_null" => "NonNull",
+    nonnull_unsound_05: "verify_units/nonnull_unsound_5" => "unsound_unrelated_guard" => "NonNull",
+    nonnull_unsound_06: "verify_units/nonnull_unsound_6" => "unsound_nonnull_wrapper_from_null" => "NonNull",
+}
+
+// NonNull manual case: chained contract propagation through a named contract.
+#[test]
+fn nonnull_sound_01() {
+    let output = run_with_args("verify_units/nonnull_sound_1", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: caller_with_contract");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_chained_propagation");
+    assert_contain(&output, "result: SOUND");
+}
+
+// ================ ValidPtr Sound Cases =============
+sound_tests! {
+    validptr_sound_01: "verify_units/validptr_sound_1" => "sound_zst_dangling_valid_for_any_len",
+    validptr_sound_02: "verify_units/validptr_sound_2" => "sound_stack_array_full_range",
+    validptr_sound_03: "verify_units/validptr_sound_3" => "sound_slice_suffix_guarded",
+    validptr_sound_04: "verify_units/validptr_sound_4" => "sound_scc_each_slice_element",
+    validptr_sound_05: "verify_units/validptr_sound_5" => "sound_signed_suffix_guarded",
+}
+
+// ================ ValidPtr Unsound Cases =============
+unsound_tests! {
+    validptr_unsound_01: "verify_units/validptr_unsound_1" => "unsound_non_zst_dangling_not_allocated" => "ValidPtr",
+    validptr_unsound_02: "verify_units/validptr_unsound_2" => "unsound_one_past_requires_one_element" => "ValidPtr",
+    validptr_unsound_03: "verify_units/validptr_unsound_3" => "unsound_stack_array_len_too_large" => "ValidPtr",
+    validptr_unsound_04: "verify_units/validptr_unsound_4" => "unsound_scc_branch_uses_one_past" => "ValidPtr",
+    validptr_unsound_05: "verify_units/validptr_unsound_5" => "unsound_signed_suffix_missing_lower_bound" => "ValidPtr",
+}
+
+// ================ Deref Sound Cases =============
+#[test]
+fn deref_sound_cases() {
+    let output = run_with_args("verify_units/deref_sound_1", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: sound_deref_slice_prefix");
+    assert_contain(&output, "Deref | Proved");
+    assert_contain(&output, "result: SOUND");
+}
+
+// ================ Deref Unsound Cases =============
+unsound_tests! {
+    deref_unsound_01: "verify_units/deref_unsound_1" => "unsound_deref_one_past" => "Deref",
 }
 
 // ================ InBound Sound Cases =============
@@ -176,7 +192,12 @@ unsound_tests! {
     inbound_unsound_12: "verify_units/inbound_unsound_12" => "unsound_std_range_missing_end_guard" => "InBound",
 }
 
-// ================ Init Std Sound Cases =============
+// ================ InBound Manual Cases =============
+unsound_weak_tests! {
+    inbound_std_unsound_02: "verify_units/inbound_std_unsound_2" => "unsound_std_copy_nonoverlapping_dst_unguarded" => "ValidPtr",
+}
+
+// ================ Init Sound Cases =============
 sound_tests! {
     init_std_sound_01: "verify_units/init_std_sound_1" => "sound_assume_init_read_after_write",
     init_std_sound_02: "verify_units/init_std_sound_2" => "sound_assume_init_after_write",
@@ -188,7 +209,7 @@ sound_tests! {
     init_ctx_sound_02: "verify_units/init_ctx_sound_1" => "maybe_init_slot",
 }
 
-// ================ Init Std Unsound Cases =============
+// ================ Init Unsound Cases =============
 unsound_tests! {
     init_std_unsound_01: "verify_units/init_std_unsound_1" => "unsound_assume_init_read_without_write" => "Init",
     init_std_unsound_02: "verify_units/init_std_unsound_2" => "unsound_assume_init_without_write" => "Init",
@@ -197,6 +218,11 @@ unsound_tests! {
     init_std_unsound_05: "verify_units/init_std_unsound_5" => "unsound_intra_helper_maybe_initializes" => "Init",
     init_std_unsound_06: "verify_units/init_std_unsound_6" => "unsound_from_raw_parts_uninitialized" => "Init",
     init_std_unsound_08: "verify_units/init_std_unsound_8" => "unsound_len_bound_loop_skips_even_indices" => "Init",
+}
+
+// Custom: `from_raw_parts` with the wrong element type causes multiple failures.
+unsound_weak_tests! {
+    init_std_unsound_07: "verify_units/init_std_unsound_7" => "unsound_from_raw_parts_wrong_element_type" => "Init",
 }
 
 // ================ ValidNum Sound Cases =============
@@ -225,30 +251,83 @@ unsound_tests! {
     validnum_ifelse_unsound_01: "verify_units/validnum_ifelse_unsound_1" => "unsound_sized_ifelse" => "ValidNum",
 }
 
-// ================ ValidPtr Sound Cases =============
-sound_tests! {
-    validptr_sound_01: "verify_units/validptr_sound_1" => "sound_zst_dangling_valid_for_any_len",
-    validptr_sound_02: "verify_units/validptr_sound_2" => "sound_stack_array_full_range",
-    validptr_sound_03: "verify_units/validptr_sound_3" => "sound_slice_suffix_guarded",
-    validptr_sound_04: "verify_units/validptr_sound_4" => "sound_scc_each_slice_element",
-    validptr_sound_05: "verify_units/validptr_sound_5" => "sound_signed_suffix_guarded",
+// ================ ValidNum Manual Unsound Cases =============
+unsound_weak_tests! {
+    validnum_std_unsound_01: "verify_units/validnum_std_unsound_1" => "unsound_std_from_raw_parts_validnum_overflow" => "ValidNum",
+    validnum_std_unsound_02: "verify_units/validnum_std_unsound_2" => "unsound_std_copy_nonoverlapping_validnum" => "ValidNum",
 }
 
-// ================ ValidPtr Unsound Cases =============
+// ================ Typed Provenance Cases =============
+#[test]
+fn typed_provenance_cases() {
+    let output = run_with_args("verify_units/typed_cases", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: sound_reference_source");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_slice_element_source");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_repr_c_field_source");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_generic_reference_source");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_branch_all_sources_typed");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_scc_preserves_typed_source");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_maybeuninit_after_write");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_align_to_same_type");
+    assert_contain(&output, "result: SOUND");
+    assert_unproved_exclusive(&output, "unsound_u8_bytes_as_u32", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_u16_slice_as_u32", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_uninit_memory_as_u32", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_invalid_bool_bits", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_invalid_char_bits", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_invalid_enum_discriminant", &["Typed"]);
+    assert_unproved_exclusive(&output, "unsound_branch_selects_untyped_source", &["Typed"]);
+    assert_unproved_exclusive(
+        &output,
+        "unsound_scc_overwrites_with_untyped_source",
+        &["Typed"],
+    );
+}
+
+// ================ Alive Sound Cases =============
+#[test]
+fn alive_sound_01() {
+    let output = run_with_args("verify_units/alive_sound_01", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: SliceHost::<'a, T>::get");
+    assert_contain(&output, "Alive | Proved");
+}
+
+#[test]
+fn alive_sound_02() {
+    let output = run_with_args("verify_units/alive_sound_02", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: MutSliceHost::<'a, T>::get_mut");
+    assert_contain(&output, "Alive | Proved");
+}
+
+#[test]
+fn alive_sound_03() {
+    let output = run_with_args("verify_units/alive_sound_03", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: slice_from_host");
+    assert_contain(&output, "Alive | Proved");
+}
+
+// ================ Alive Unsound Cases =============
+unsound_weak_tests! {
+    alive_unsound_01: "verify_units/alive_unsound_01" => "DangerousAliaser::<'a, T>::get_mut" => "Alive",
+    alive_unsound_02: "verify_units/alive_unsound_02" => "slice_tied_to_unrelated_host" => "ValidNum",
+    alive_unsound_03: "verify_units/alive_unsound_03" => "static_slice_from_local_vec" => "Alive",
+}
+
+// Regression: `Alive` on a raw-pointer field must NOT be proved from the struct
+// parameter alone — a raw pointer field has no liveness guarantee unless the
+// struct declares an `Alive`/`Allocated` invariant on it.
 unsound_tests! {
-    validptr_unsound_01: "verify_units/validptr_unsound_1" => "unsound_non_zst_dangling_not_allocated" => "ValidPtr",
-    validptr_unsound_02: "verify_units/validptr_unsound_2" => "unsound_one_past_requires_one_element" => "ValidPtr",
-    validptr_unsound_03: "verify_units/validptr_unsound_3" => "unsound_stack_array_len_too_large" => "ValidPtr",
-    validptr_unsound_04: "verify_units/validptr_unsound_4" => "unsound_scc_branch_uses_one_past" => "ValidPtr",
-    validptr_unsound_05: "verify_units/validptr_unsound_5" => "unsound_signed_suffix_missing_lower_bound" => "ValidPtr",
+    alive_unsound_04: "verify_units/alive_unsound_04" => "use_after_free" => "Alive",
 }
 
-// ================ Deref Unsound Cases =============
-unsound_tests! {
-    deref_unsound_01: "verify_units/deref_unsound_1" => "unsound_deref_one_past" => "Deref",
-}
-
-// ================ Alias Sound Verify Cases =============
+// ================ Alias Sound Cases =============
 sound_tests! {
     alias_sound_01: "verify_units/alias_sound_01" => "sound_shared_slice_no_raw_mutation",
     alias_sound_02: "verify_units/alias_sound_02" => "sound_raw_use_after_slice_scope",
@@ -268,7 +347,7 @@ sound_tests! {
     alias_sound_16: "verify_units/alias_sound_16" => "sound_two_independent_fields",
 }
 
-// ================ Alias Unsound Verify Cases =============
+// ================ Alias Unsound Cases =============
 unsound_hazard_tests! {
     alias_unsound_03: "verify_units/alias_unsound_03" => "unsound_vec_push_while_raw_slice_live" => "Alias",
     alias_unsound_04: "verify_units/alias_unsound_04" => "unsound_box_from_raw_then_raw_write" => "Alias",
@@ -288,44 +367,62 @@ unsound_hazard_tests! {
 // hazard, not discharged by the presence of a shared reference.  The raw
 // pointer is also not known non-null (the `Init` requires does not imply
 // `NonNull` in the current model), so both properties are unproved.
-#[test]
-fn alias_unsound_21() {
-    let output = run_with_args("verify_units/alias_unsound_21", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(
-        &output,
-        "unsound_independent_mut_ptr_aliases_shared",
-        &["Alias", "NonNull", "InBound"],
-        "UNSOUND",
-    );
+unsound_weak_tests! {
+    alias_unsound_21: "verify_units/alias_unsound_21" => "unsound_independent_mut_ptr_aliases_shared" => "Alias",
+    alias_unsound_24: "verify_units/alias_unsound_24" => "unsound_shared_slice_cast_write" => "Alias",
+    alias_unsound_28: "verify_units/alias_unsound_28" => "shared_then_mut" => "Alias",
+}
+
+// A raw slice/view produced from a shared `&[T]` or `&mut [T]` is later mutated
+// or read through a raw pointer while the view is live — an undeclared Alias
+// hazard (and, for `as_bytes_mut_ptr_len_missing_alias`, the length/validity
+// parts fail too).
+unsound_weak_tests! {
+    alias_unsound_01: "verify_units/alias_unsound_01" => "unsound_shared_slice_then_raw_write" => "Alias",
+    alias_unsound_02: "verify_units/alias_unsound_02" => "unsound_mut_slice_then_raw_read" => "Alias",
+    alias_unsound_20: "verify_units/alias_unsound_20" => "as_bytes_mut_ptr_len_missing_alias" => "Alias",
 }
 
 // The raw-pointer deref has a `Ptr2Ref` obligation; its memory-shape parts
 // (`NonNull`/`Allocated`/`InBound`/`Align`/`Init`) are discharged by the
 // struct's explicit `#[rapx::invariant]`s, leaving only the `Alias` hazard
 // unproved.
-#[test]
-fn alias_unsound_25() {
-    let output = run_with_args("verify_units/alias_unsound_25", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "Node::next_mut", &["Alias"]);
-}
-
-#[test]
-fn alias_unsound_26() {
-    let output = run_with_args("verify_units/alias_unsound_26", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "Node::get_next", &["Alias"]);
+unsound_hazard_tests! {
+    alias_unsound_25: "verify_units/alias_unsound_25" => "Node::next_mut" => "Alias",
+    alias_unsound_26: "verify_units/alias_unsound_26" => "Node::get_next" => "Alias",
 }
 
 // An unannotated raw-pointer field cannot discharge any of its `Ptr2Ref`
 // memory-shape obligations: `NonNull`/`Allocated`/`InBound`/`Align`/`Init` all
 // fail, alongside the `Alias` hazard.
+unsound_weak_tests! {
+    alias_unsound_30: "verify_units/alias_unsound_30" => "Node::next_ref" => "NonNull",
+}
+
+// A safe method exposing a raw field (`as_slice_mut`) while the view may live:
+// the produced mutable view aliases the field's target, an undeclared hazard.
+unsound_weak_tests! {
+    alias_unsound_05: "verify_units/alias_unsound_05" => "unsound_box_from_raw_drop_then_raw_read" => "Alias",
+    alias_unsound_06: "verify_units/alias_unsound_06" => "RawSlot::as_slice_mut" => "Alias",
+    alias_unsound_11: "verify_units/alias_unsound_11" => "PublicRawSlot::as_slice_mut" => "Alias",
+    alias_unsound_12: "verify_units/alias_unsound_12" => "GetterSlot::as_slice_mut" => "Alias",
+    alias_unsound_13: "verify_units/alias_unsound_13" => "WriterSlot::as_slice_mut" => "Alias",
+    alias_unsound_14: "verify_units/alias_unsound_14" => "SplitSlot::as_slice_mut" => "Alias",
+    alias_unsound_17: "verify_units/alias_unsound_17" => "TraitSlot::as_slice_mut" => "Alias",
+}
+
 #[test]
-fn alias_unsound_30() {
-    let output = run_with_args("verify_units/alias_unsound_30", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "Node::next_ref",
-        &["NonNull", "Allocated", "InBound", "Align", "Init", "Alias"],
-    );
+fn alias_unsound_07() {
+    let output = run_with_args("verify_units/alias_unsound_07", &["verify"]);
+    assert_unproved(&output, "make_mut_slice", "Alias");
+}
+
+// `&*p` on a one-past-end pointer: the raw-ptr-deref checkpoint checks
+// `NonNull + Allocated + InBound`, so the out-of-bounds deref is rejected via
+// `InBound | Failed` (the pointer has provenance, so `Allocated` holds, but the
+// one-past-end access exceeds the allocation).
+unsound_tests! {
+    alias_unsound_22: "verify_units/alias_unsound_22" => "unsound_oob_deref_missing_validptr" => "InBound",
 }
 
 // ================ NonOverlap Sound Cases =============
@@ -334,11 +431,123 @@ sound_tests! {
     nonoverlap_sound_02: "verify_units/nonoverlap_sound_02" => "sound_copy_nonoverlapping_disjoint",
 }
 
-// ================ User-Defined DSL Contract (pred!) Case =============
-sound_tests! {
-    dsl_custom_def: "verify_units/dsl_custom_def" => "sound_read",
+// ================ NonOverlap Unsound Cases =============
+unsound_tests! {
+    nonoverlap_unsound_01: "verify_units/nonoverlap_unsound_01" => "unsound_copy_nonoverlapping_overlap" => "NonOverlap",
 }
 
+// ================ NoPadding (intrinsics::raw_eq) Cases =============
+sound_tests! {
+    raw_eq_sound_01: "verify_units/raw_eq_sound_01" => "sound_raw_eq_no_padding",
+}
+
+unsound_tests! {
+    raw_eq_unsound_01: "verify_units/raw_eq_unsound_01" => "unsound_raw_eq_padded" => "NoPadding",
+}
+
+// ================ Split Transmute Cases =============
+#[test]
+fn split_transmute_unsound() {
+    let output = run_with_args("verify_units/split_transmute_unsound", CMD_VERIFY_TARGETED);
+    assert_unproved_exclusive(
+        &output,
+        "align_without_contract_generic",
+        &["SplitTransmute"],
+    );
+    assert_unproved_exclusive(
+        &output,
+        "unsound_align_to_bool_from_bytes",
+        &["SplitTransmute"],
+    );
+    assert_contain(&output, "function: align_without_contract_u32");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: align_without_contract_u16");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: align_without_contract_u8");
+    assert_contain(&output, "result: SOUND");
+}
+
+#[test]
+fn split_transmute_nonzero() {
+    let output = run_with_args("verify_units/split_transmute_nonzero", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: align_to_nonzero_u16");
+    assert_contain(&output, "result: UNSOUND");
+    assert_contain(&output, "function: align_to_nonzero_u32");
+    assert_contain(&output, "result: UNSOUND");
+    assert_contain(&output, "function: align_to_nonzero_u8");
+    assert_contain(&output, "result: UNSOUND");
+}
+
+#[test]
+fn split_transmute_sound() {
+    let output = run_with_args("verify_units/split_transmute_sound", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: align_to_u8_sound");
+    assert_contain(&output, "result: SOUND");
+}
+
+// ================ ValidCStr Sound Cases =============
+sound_tests! {
+    validcstring_std_sound_01: "verify_units/validcstring_std_sound_01" => "sound_literal_bytes_with_nul",
+    validcstring_std_sound_02: "verify_units/validcstring_std_sound_02" => "sound_variable_bytes_with_guard",
+    validcstring_std_sound_03: "verify_units/validcstring_std_sound_03" => "sound_static_from_ptr",
+    validcstring_std_sound_04: "verify_units/validcstring_std_sound_04" => "sound_branch_selects_valid_source",
+    validcstring_std_sound_05: "verify_units/validcstring_std_sound_05" => "sound_input_slice_exact_match",
+    validcstring_std_sound_06: "verify_units/validcstring_std_sound_06" => "sound_vec_with_nul_from_variables",
+    validcstring_std_sound_07: "verify_units/validcstring_std_sound_07" => "sound_loop_builds_valid_c_string",
+    validcstring_std_sound_08: "verify_units/validcstring_std_sound_08" => "sound_from_ptr_suffix_after_add",
+    validcstring_std_sound_09: "verify_units/validcstring_std_sound_subslice" => "sound_subslice_cstr",
+}
+
+// ================ ValidCStr Unsound Cases =============
+unsound_tests! {
+    validcstring_std_unsound_01: "verify_units/validcstring_std_unsound_01" => "unsound_bytes_without_nul" => "ValidCStr",
+    validcstring_std_unsound_02: "verify_units/validcstring_std_unsound_02" => "unsound_bytes_with_interior_nul" => "ValidCStr",
+    validcstring_std_unsound_03: "verify_units/validcstring_std_unsound_03" => "unsound_static_from_ptr_without_nul" => "ValidCStr",
+    validcstring_std_unsound_04: "verify_units/validcstring_std_unsound_04" => "unsound_branch_mixes_valid_and_invalid" => "ValidCStr",
+    validcstring_std_unsound_05: "verify_units/validcstring_std_unsound_05" => "unsound_input_slice_only_checks_last_nul" => "ValidCStr",
+    validcstring_std_unsound_06: "verify_units/validcstring_std_unsound_06" => "unsound_vec_with_variable_interior_nul" => "ValidCStr",
+    validcstring_std_unsound_07: "verify_units/validcstring_std_unsound_07" => "unsound_loop_writes_interior_nul" => "ValidCStr",
+    validcstring_std_unsound_08: "verify_units/validcstring_std_unsound_08" => "unsound_nested_scc_switches_to_invalid" => "ValidCStr",
+    validcstring_std_unsound_10: "verify_units/validcstring_std_unsound_subslice" => "unsound_subslice_cstr" => "ValidCStr",
+}
+
+// ================ ValidCStr Manual Cases =============
+unsound_weak_tests! {
+    validcstring_std_unsound_09: "verify_units/validcstring_std_unsound_09" => "unsound_from_ptr_suffix_without_nul" => "ValidCStr",
+}
+
+// ================ ValidString Sound Cases =============
+sound_tests! {
+    validstring_std_sound_01: "verify_units/validstring_std_sound_01" => "sound_valid_utf8_literal",
+    string_as_ptr_sound_01: "verify_units/string_as_ptr_sound_01" => "sound_string_as_ptr",
+}
+
+// ================ ValidString Unsound Cases =============
+unsound_tests! {
+    validstring_std_unsound_01: "verify_units/validstring_std_unsound_01" => "unsound_invalid_utf8_literal" => "ValidString",
+}
+
+// ================ AsChunks Sound Cases =============
+#[test]
+fn as_chunks_sound_cases() {
+    let output = run_with_args("verify_units/as_chunks_sound_01", CMD_VERIFY_TARGETED);
+    assert_contain(&output, "function: sound_as_chunks_unchecked_exact_div");
+    assert_contain(&output, "result: SOUND");
+    assert_contain(&output, "function: sound_exact_div_guard");
+    assert_contain(&output, "result: SOUND");
+}
+
+// ================ AsChunks Unsound Cases =============
+#[test]
+fn as_chunks_unsound_cases() {
+    let output = run_with_args("verify_units/as_chunks_unsound_01", CMD_VERIFY_TARGETED);
+    assert_unproved_exclusive(
+        &output,
+        "unsound_as_chunks_unchecked_missing_exact_div",
+        &["ValidNum"],
+    );
+    assert_unproved_exclusive(&output, "unsound_exact_div_missing_guard", &["ValidNum"]);
+}
 
 // ================ Align Repeat Threshold Cases =============
 #[test]
@@ -403,209 +612,9 @@ fn loop_repeat_threshold_auto_cases() {
     assert_unproved_exclusive(&output, "repeat1_sound_repeat2_unsound_validnum_parity_oscillation", &["ValidNum"]);
 }
 
-// ================ ValidCStr Manual Cases =============
-#[test]
-fn validcstring_std_unsound_09() {
-    let output = run_with_args("verify_units/validcstring_std_unsound_09", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "unsound_from_ptr_suffix_without_nul", &["ValidCStr", "InBound"]);
-}
-
-// ================ NonNull Manual Cases =============
-#[test]
-fn nonnull_sound_01() {
-    let output = run_with_args("verify_units/nonnull_sound_1", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: caller_with_contract");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_chained_propagation");
-    assert_contain(&output, "result: SOUND");
-}
-
-// ================ InBound Manual Cases =============
-#[test]
-fn inbound_std_unsound_02() {
-    let output = run_with_args("verify_units/inbound_std_unsound_2", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "unsound_std_copy_nonoverlapping_dst_unguarded",
-        &["ValidPtr", "NonOverlap", "ValidNum"],
-    );
-}
-
-// ================ AsChunks Sound Cases =============
-#[test]
-fn as_chunks_sound_cases() {
-    let output = run_with_args("verify_units/as_chunks_sound_01", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: sound_as_chunks_unchecked_exact_div");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_exact_div_guard");
-    assert_contain(&output, "result: SOUND");
-}
-
-// ================ ValidNum Manual Unsound Cases =============
-#[test]
-fn validnum_std_unsound_01() {
-    let output = run_with_args("verify_units/validnum_std_unsound_1", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "unsound_std_from_raw_parts_validnum_overflow",
-        &["ValidNum", "ValidPtr", "Init"],
-    );
-}
-
-#[test]
-fn validnum_std_unsound_02() {
-    let output = run_with_args("verify_units/validnum_std_unsound_2", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "unsound_std_copy_nonoverlapping_validnum",
-        &["ValidNum", "ValidPtr", "NonOverlap"],
-    );
-}
-
-// ================ AsChunks Unsound Cases =============
-#[test]
-fn as_chunks_unsound_cases() {
-    let output = run_with_args("verify_units/as_chunks_unsound_01", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "unsound_as_chunks_unchecked_missing_exact_div",
-        &["ValidNum"],
-    );
-    assert_unproved_exclusive(&output, "unsound_exact_div_missing_guard", &["ValidNum"]);
-}
-
-// ================ Deref Sound Cases =============
-#[test]
-fn deref_sound_cases() {
-    let output = run_with_args("verify_units/deref_sound_1", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: sound_deref_slice_prefix");
-    assert_contain(&output, "Deref | Proved");
-    assert_contain(&output, "result: SOUND");
-}
-
-// ================ Box Deref ================
-#[test]
-fn box_deref() {
-    let output = run_with_args("verify_units/box_deref", CMD_VERIFY_SCAN);
-    assert_function_result(&output, "f", "SOUND");
-    // `*box` is a safe deref (skipped), but `transmute::<Box<T>, *mut T>` is a
-    // real raw pointer, so its deref must be flagged as an unsafe raw-ptr-deref.
-    assert_contain(&output, "raw-ptr-deref");
-}
-
-// ================ Self-recursive Callee ================
-// A self-recursive callee must not overflow the pointer-arithmetic wrapper
-// summary (which is cycle-detected and memoized).
-#[test]
-fn self_recursive_callee() {
-    let output = run_with_args("verify_units/self_recursive_callee", CMD_VERIFY_SCAN);
-    assert_not_contain(&output, "overflowed");
-    assert_function_result(&output, "target", "SOUND");
-}
-
-// ================ Call Chain Depth ================
-// A 4-deep call chain of 4-way branching callees used to be summarized once per
-// path that reached them (exponential); the must-write summary is now memoized.
-#[test]
-fn call_chain_depth() {
-    let output = run_with_args("verify_units/call_chain_depth", CMD_VERIFY_SCAN);
-    assert_function_result(&output, "target", "SOUND");
-}
-
-// ================ Typed Provenance Cases =============
-#[test]
-fn typed_provenance_cases() {
-    let output = run_with_args("verify_units/typed_cases", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: sound_reference_source");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_slice_element_source");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_repr_c_field_source");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_generic_reference_source");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_branch_all_sources_typed");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_scc_preserves_typed_source");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_maybeuninit_after_write");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: sound_align_to_same_type");
-    assert_contain(&output, "result: SOUND");
-    assert_unproved_exclusive(&output, "unsound_u8_bytes_as_u32", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_u16_slice_as_u32", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_uninit_memory_as_u32", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_invalid_bool_bits", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_invalid_char_bits", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_invalid_enum_discriminant", &["Typed"]);
-    assert_unproved_exclusive(&output, "unsound_branch_selects_untyped_source", &["Typed"]);
-    assert_unproved_exclusive(
-        &output,
-        "unsound_scc_overwrites_with_untyped_source",
-        &["Typed"],
-    );
-}
-
-// ================ Alive Sound Cases =============
-#[test]
-fn alive_sound_01() {
-    let output = run_with_args("verify_units/alive_sound_01", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: SliceHost::<'a, T>::get");
-    assert_contain(&output, "Alive | Proved");
-}
-
-#[test]
-fn alive_sound_02() {
-    let output = run_with_args("verify_units/alive_sound_02", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: MutSliceHost::<'a, T>::get_mut");
-    assert_contain(&output, "Alive | Proved");
-}
-
-#[test]
-fn alive_sound_03() {
-    let output = run_with_args("verify_units/alive_sound_03", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: slice_from_host");
-    assert_contain(&output, "Alive | Proved");
-}
-
-// ================ Alive Unsound Cases =============
-#[test]
-fn alive_unsound_01() {
-    let output = run_with_args("verify_units/alive_unsound_01", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "DangerousAliaser::<'a, T>::get_mut",
-        &["Alive", "NonNull", "ValidPtr", "Align"],
-    );
-}
-
-#[test]
-fn alive_unsound_02() {
-    let output = run_with_args("verify_units/alive_unsound_02", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "slice_tied_to_unrelated_host",
-        &["ValidNum", "Alive", "ValidPtr", "Init", "NonNull", "Alias", "Allocated"],
-    );
-}
-
-#[test]
-fn alive_unsound_03() {
-    let output = run_with_args("verify_units/alive_unsound_03", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "static_slice_from_local_vec",
-        &["Alive", "Init", "Alias", "Align", "NonNull", "ValidPtr"],
-    );
-}
-
-// Regression: `Alive` on a raw-pointer field must NOT be proved from the struct
-// parameter alone — a raw pointer field has no liveness guarantee unless the
-// struct declares an `Alive`/`Allocated` invariant on it.
-#[test]
-fn alive_unsound_04() {
-    let output = run_with_args("verify_units/alive_unsound_04", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "use_after_free", &["Alive"]);
+// ================ User-Defined DSL Contract (pred!) Case =============
+sound_tests! {
+    dsl_custom_def: "verify_units/dsl_custom_def" => "sound_read",
 }
 
 // ================ Struct Invariant =============
@@ -641,44 +650,33 @@ fn skip_invariant_sound_callee() {
     assert_contain(&output, "result: SOUND");
 }
 
-// ================ Split Transmute Cases =============
+// ================ Box Deref ================
 #[test]
-fn split_transmute_unsound() {
-    let output = run_with_args("verify_units/split_transmute_unsound", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(
-        &output,
-        "align_without_contract_generic",
-        &["SplitTransmute"],
-    );
-    assert_unproved_exclusive(
-        &output,
-        "unsound_align_to_bool_from_bytes",
-        &["SplitTransmute"],
-    );
-    assert_contain(&output, "function: align_without_contract_u32");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: align_without_contract_u16");
-    assert_contain(&output, "result: SOUND");
-    assert_contain(&output, "function: align_without_contract_u8");
-    assert_contain(&output, "result: SOUND");
+fn box_deref() {
+    let output = run_with_args("verify_units/box_deref", CMD_VERIFY_SCAN);
+    assert_function_result(&output, "f", "SOUND");
+    // `*box` is a safe deref (skipped), but `transmute::<Box<T>, *mut T>` is a
+    // real raw pointer, so its deref must be flagged as an unsafe raw-ptr-deref.
+    assert_contain(&output, "raw-ptr-deref");
 }
 
+// ================ Self-recursive Callee ================
+// A self-recursive callee must not overflow the pointer-arithmetic wrapper
+// summary (which is cycle-detected and memoized).
 #[test]
-fn split_transmute_nonzero() {
-    let output = run_with_args("verify_units/split_transmute_nonzero", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: align_to_nonzero_u16");
-    assert_contain(&output, "result: UNSOUND");
-    assert_contain(&output, "function: align_to_nonzero_u32");
-    assert_contain(&output, "result: UNSOUND");
-    assert_contain(&output, "function: align_to_nonzero_u8");
-    assert_contain(&output, "result: UNSOUND");
+fn self_recursive_callee() {
+    let output = run_with_args("verify_units/self_recursive_callee", CMD_VERIFY_SCAN);
+    assert_not_contain(&output, "overflowed");
+    assert_function_result(&output, "target", "SOUND");
 }
 
+// ================ Call Chain Depth ================
+// A 4-deep call chain of 4-way branching callees used to be summarized once per
+// path that reached them (exponential); the must-write summary is now memoized.
 #[test]
-fn split_transmute_sound() {
-    let output = run_with_args("verify_units/split_transmute_sound", CMD_VERIFY_TARGETED);
-    assert_contain(&output, "function: align_to_u8_sound");
-    assert_contain(&output, "result: SOUND");
+fn call_chain_depth() {
+    let output = run_with_args("verify_units/call_chain_depth", CMD_VERIFY_SCAN);
+    assert_function_result(&output, "target", "SOUND");
 }
 
 // ================ Trait Unsound Cases =============
@@ -699,125 +697,6 @@ fn trait_unsound_verify() {
     assert_contain(&output, "ensures");
     assert_contain(&output, "NonNull");
     assert_contain(&output, "verification: deferred");
-}
-
-// ================ Alias Multi-Property Unsound Cases =============
-#[test]
-fn alias_unsound_01() {
-    let output = run_with_args("verify_units/alias_unsound_01", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(&output, "unsound_shared_slice_then_raw_write", &["Alias", "ValidNum"], "UNSOUND");
-}
-
-#[test]
-fn alias_unsound_02() {
-    let output = run_with_args("verify_units/alias_unsound_02", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(&output, "unsound_mut_slice_then_raw_read", &["Alias", "ValidNum"], "UNSOUND");
-}
-
-#[test]
-fn alias_unsound_20() {
-    let output = run_with_args("verify_units/alias_unsound_20", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(&output, "as_bytes_mut_ptr_len_missing_alias", &["Alias", "ValidNum", "ValidPtr"], "UNSOUND");
-}
-
-// `&*p` on a one-past-end pointer: the raw-ptr-deref checkpoint checks
-// `NonNull + Allocated + InBound`, so the out-of-bounds deref is rejected via
-// `InBound | Failed` (the pointer has provenance, so `Allocated` holds, but the
-// one-past-end access exceeds the allocation).
-#[test]
-fn alias_unsound_22() {
-    let output = run_with_args("verify_units/alias_unsound_22", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(
-        &output,
-        "unsound_oob_deref_missing_validptr",
-        &["InBound"],
-        "UNSOUND",
-    );
-}
-
-#[test]
-fn alias_unsound_24() {
-    let output = run_with_args("verify_units/alias_unsound_24", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(
-        &output,
-        "unsound_shared_slice_cast_write",
-        &["Alias", "Allocated"],
-        "UNSOUND",
-    );
-}
-
-#[test]
-fn alias_unsound_28() {
-    let output = run_with_args("verify_units/alias_unsound_28", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(
-        &output,
-        "shared_then_mut",
-        &["Alias", "Init", "NonNull", "InBound"],
-        "UNSOUND",
-    );
-}
-
-// Custom test: from_raw_parts wrong element type causes multiple failures
-#[test]
-fn init_std_unsound_07() {
-    let output = run_with_args("verify_units/init_std_unsound_7", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(&output, "unsound_from_raw_parts_wrong_element_type", &["Init", "Align", "ValidPtr"], "UNSOUND");
-}
-
-#[test]
-fn alias_unsound_05() {
-    let output = run_with_args("verify_units/alias_unsound_05", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "unsound_box_from_raw_drop_then_raw_read", &["Alias", "Allocated", "ValidPtr", "Typed"]);
-}
-
-#[test]
-fn alias_unsound_06() {
-    let output = run_with_args("verify_units/alias_unsound_06", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "RawSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
-}
-
-#[test]
-fn alias_unsound_07() {
-    let output = run_with_args("verify_units/alias_unsound_07", &["verify"]);
-    assert_unproved_exclusive(&output, "make_mut_slice", &["Alias", "Alive", "Init", "NonNull", "ValidPtr", "ValidNum", "Allocated"]);
-}
-
-// ================ NonOverlap Unsound Cases =============
-#[test]
-fn nonoverlap_unsound_01() {
-    let output = run_with_args("verify_units/nonoverlap_unsound_01", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "unsound_copy_nonoverlapping_overlap", &["NonOverlap"]);
-}
-
-// ================ Alias Long Multi-Property Unsound Cases =============
-#[test]
-fn alias_unsound_11() {
-    let output = run_with_args("verify_units/alias_unsound_11", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "PublicRawSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
-}
-
-#[test]
-fn alias_unsound_12() {
-    let output = run_with_args("verify_units/alias_unsound_12", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "GetterSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
-}
-
-#[test]
-fn alias_unsound_13() {
-    let output = run_with_args("verify_units/alias_unsound_13", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "WriterSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
-}
-
-#[test]
-fn alias_unsound_14() {
-    let output = run_with_args("verify_units/alias_unsound_14", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "SplitSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
-}
-
-#[test]
-fn alias_unsound_17() {
-    let output = run_with_args("verify_units/alias_unsound_17", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "TraitSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 // ================ Module/Crate Filter Tests =============
@@ -863,15 +742,6 @@ fn filter_by_crate() {
         &["verify", "--mode", "targeted", "--crate", "nonexistent_crate"],
     );
     assert_contain(&output, "--crate \"nonexistent_crate\" matched no targets");
-}
-
-// ================ NoPadding (intrinsics::raw_eq) Cases =============
-sound_tests! {
-    raw_eq_sound_01: "verify_units/raw_eq_sound_01" => "sound_raw_eq_no_padding",
-}
-
-unsound_tests! {
-    raw_eq_unsound_01: "verify_units/raw_eq_unsound_01" => "unsound_raw_eq_padded" => "NoPadding",
 }
 
 // ================ Thread-Safety (Send/Sync) Auto-Trait Cases =============

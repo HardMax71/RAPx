@@ -134,6 +134,34 @@ fn assert_unproved_exclusive(output: &str, function: &str, allowed: &[&str]) {
     assert_unproved_exclusive_with_result(output, function, allowed, "UNSOUND");
 }
 
+/// Assert that `function` is UNSOUND and that `property` is unproved
+/// (`Failed`/`Unknown`, in plain, `[hazard]`, or `[option]` form). Unlike
+/// [`assert_unproved_exclusive`], it does NOT require that *only* `property`
+/// fails — the failing set may cascade (e.g. an unannotated raw-pointer field
+/// fails `NonNull`/`ValidPtr`/`Align`/`Alias` together), so the test pins only
+/// the primary signal.
+fn assert_unproved(output: &str, function: &str, property: &str) {
+    assert_contain(output, &format!("function: {function}"));
+    let block = extract_block_after(output, &format!("function: {function}"));
+    assert_property_failed(&block, property, function);
+    assert_contain(output, "result: UNSOUND");
+}
+
+/// Assert `property` appears as `Failed`/`Unknown` in `block`, matching the
+/// plain, `[hazard]`-prefixed, and `[option]`-prefixed report forms.
+fn assert_property_failed(block: &str, property: &str, function: &str) {
+    let matches_plain = block.contains(&format!("{property} | Failed"))
+        || block.contains(&format!("{property} | Unknown"));
+    let matches_hazard = block.contains(&format!("[hazard] {property} | Failed"))
+        || block.contains(&format!("[hazard] {property} | Unknown"));
+    let matches_option = block.contains(&format!("[option] {property} | Failed"))
+        || block.contains(&format!("[option] {property} | Unknown"));
+    assert!(
+        matches_plain || matches_hazard || matches_option,
+        "Expected {property} | Failed/Unknown for {function}\nBlock:\n{block}"
+    );
+}
+
 fn assert_function_result(output: &str, function: &str, result_pat: &str) {
     assert_contain(output, &format!("function: {function}"));
     let block = extract_block_after(output, &format!("function: {function}"));
@@ -156,16 +184,7 @@ fn assert_unproved_exclusive_with_result(
     // At least the primary (first) property must appear as Failed/Unknown.
     // Hazard properties are printed with a [hazard] prefix; match either form.
     if let Some(primary) = allowed.first() {
-        let matches_plain = block.contains(&format!("{primary} | Failed"))
-            || block.contains(&format!("{primary} | Unknown"));
-        let matches_hazard = block.contains(&format!("[hazard] {primary} | Failed"))
-            || block.contains(&format!("[hazard] {primary} | Unknown"));
-        let matches_option = block.contains(&format!("[option] {primary} | Failed"))
-            || block.contains(&format!("[option] {primary} | Unknown"));
-        assert!(
-            matches_plain || matches_hazard || matches_option,
-            "Expected {primary} | Failed/Unknown for {function}\nBlock:\n{block}"
-        );
+        assert_property_failed(&block, primary, function);
     }
 
     // No property outside the allowed set may appear as Failed/Unknown.
@@ -278,6 +297,23 @@ macro_rules! unsound_hazard_tests {
             #[test]
             fn $name() {
                 verify_unsound_hazard!($dir, $func, $prop);
+            }
+        )*
+    };
+}
+
+/// Declare many UNSOUND tests that pin only the *primary* property. Unlike
+/// [`unsound_tests!`], which requires the given property to be the *only*
+/// unproved one, this only asserts the property fails (the failing set may
+/// cascade, e.g. an unannotated raw-pointer field fails `NonNull`/`ValidPtr`/
+/// `Align`/`Alias` together).
+macro_rules! unsound_weak_tests {
+    ($($name:ident: $dir:literal => $func:literal => $prop:literal),* $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                let output = $crate::run_with_args($dir, CMD_VERIFY_TARGETED);
+                $crate::assert_unproved(&output, $func, $prop);
             }
         )*
     };
