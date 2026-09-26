@@ -471,9 +471,6 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                         let elem_size_sym = self.size_sym(*elem_ty);
                         let (data_alloc_id, data_base) =
                             self.allocate_slice(len, elem_size_sym, elem_align, Some(*elem_ty));
-                        if let Some(ref_alloc_id) = self.alloc_for_local(local) {
-                            self.alloc_mut(ref_alloc_id).slice_data = Some(data_alloc_id);
-                        }
                         if !pointee_is_maybe_uninit {
                             self.alloc_mut(data_alloc_id).initialized = true;
                         }

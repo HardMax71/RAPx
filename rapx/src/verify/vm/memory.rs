@@ -258,10 +258,6 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
             .unwrap_or(1)
     }
 
-    pub(crate) fn alloc_for_local(&self, local: Local) -> Option<AllocId> {
-        self.local_alloc_ids.get(&local).copied()
-    }
-
     pub(crate) fn allocation_size(&self, alloc_id: AllocId) -> &Int<'ctx> {
         &self.alloc(alloc_id).size
     }
