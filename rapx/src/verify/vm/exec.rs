@@ -2134,6 +2134,61 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
         }
     }
 
+    /// HACK: `slice::align_to_offsets` computes its element split via
+    /// `const { gcd(size_of::<T>(), size_of::<U>()) }`. The recursive `gcd`
+    /// const fn cannot be inlined, so the VM would otherwise model the result as
+    /// a fresh, unconstrained constant and lose the one fact that makes the
+    /// proof go through: the gcd *divides* both sizes. That divisibility is
+    /// what turns `us = sizeof_T / gcd` / `ts = sizeof_U / gcd` into exact
+    /// divisions, giving `us * sizeof_U == ts * sizeof_T` (both the lcm) and
+    /// hence `us_len * sizeof_U <= len * sizeof_T`. Detect the `gcd` const
+    /// block and re-establish `gcd`'s key consequences as path conditions. This
+    /// is a targeted workaround for a missing general property of recursive
+    /// const fns, not an `align_to`-specific effect.
+    fn try_emit_gcd_divisibility(&mut self, operand: &Operand<'tcx>, val: &VmValue<'ctx, 'tcx>) {
+        let Operand::Constant(constant) = operand else {
+            return;
+        };
+        let rustc_middle::mir::Const::Unevaluated(uneval, _) = constant.const_ else {
+            return;
+        };
+        // Cheap gate: only a *promoted* const block can be a `gcd` const.
+        let def_name = self.tcx.def_path_str(uneval.def);
+        if !def_name.contains("::{constant") {
+            return;
+        }
+        let body = self.tcx.mir_for_ctfe(uneval.def);
+        let is_gcd = body.basic_blocks.iter().any(|bb| {
+            if let rustc_middle::mir::TerminatorKind::Call { func, .. } = &bb.terminator().kind {
+                if let Some(did) = crate::helpers::mir_utils::dep_callee_def_id(func) {
+                    return self.tcx.def_path_str(did).ends_with("::gcd");
+                }
+            }
+            false
+        });
+        if !is_gcd || uneval.args.len() < 2 {
+            return;
+        }
+        let a = self.size_sym(uneval.args.type_at(0));
+        let b = self.size_sym(uneval.args.type_at(1));
+        let g = &val.term;
+        let zero = Int::from_u64(self.ctx, 0);
+        // `g = gcd(a, b)`:
+        // 1. g divides both a and b.
+        self.path_conditions.push(a.rem(g)._eq(&zero));
+        self.path_conditions.push(b.rem(g)._eq(&zero));
+        // 2. the lcm identity `(a / g) * b == (b / g) * a`. Emitting it directly
+        //    (rather than letting Z3 derive it from the divisibility, which its
+        //    incomplete nonlinear-integer solver cannot do reliably) is what
+        //    makes `us * sizeof_U == ts * sizeof_T` — and hence
+        //    `us_len * sizeof_U <= len * sizeof_T` — provable.
+        let a_div_g = a.div(g);
+        let b_div_g = b.div(g);
+        let lhs = Int::mul(self.ctx, &[&a_div_g, &b]);
+        let rhs = Int::mul(self.ctx, &[&b_div_g, &a]);
+        self.path_conditions.push(lhs._eq(&rhs));
+    }
+
     /// Evaluate an Rvalue into a VmValue.
     fn eval_rvalue(
         &mut self,
@@ -2148,6 +2203,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 let mut val = self.value_of_operand(operand);
                 self.try_materialize_const_bytes(&mut val, operand);
                 self.inject_layout_constraints(operand, &val);
+                self.try_emit_gcd_divisibility(operand, &val);
                 val
             }
             #[cfg(not(rapx_rvalue_use_with_retag))]
@@ -2155,6 +2211,7 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 let mut val = self.value_of_operand(operand);
                 self.try_materialize_const_bytes(&mut val, operand);
                 self.inject_layout_constraints(operand, &val);
+                self.try_emit_gcd_divisibility(operand, &val);
                 val
             }
             Rvalue::Ref(_, _borrow_kind, place) => {
@@ -2781,7 +2838,27 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
             BinOp::Mul | BinOp::MulWithOverflow | BinOp::MulUnchecked => {
                 Int::mul(self.ctx, &[lhs, rhs])
             }
-            BinOp::Div => lhs.div(rhs),
+            BinOp::Div => {
+                // An *exact* division (`lhs % rhs == 0` known) is represented as
+                // a fresh variable rather than the `lhs / rhs` term. The caller
+                // still emits the Euclidean identity `lhs == quot*rhs + rem`
+                // (with `rem == 0` from the divisibility), so the fresh variable
+                // satisfies `quot*rhs == lhs` linearly. This avoids the *nested*
+                // division (`x / (b/gcd)`) that Z3's nonlinear solver can't
+                // handle, leaving only degree-2 products that `nlsat` handles
+                // far more reliably. General (any exact division), not a
+                // per-function effect.
+                let zero = Int::from_u64(self.ctx, 0);
+                let exact = self
+                    .path_conditions
+                    .iter()
+                    .any(|c| *c == lhs.rem(rhs)._eq(&zero));
+                if exact {
+                    self.fresh_int("exact_div")
+                } else {
+                    lhs.div(rhs)
+                }
+            }
             BinOp::Rem => lhs.rem(rhs),
             BinOp::Eq => self.bool_as_int(&lhs._eq(rhs)),
             BinOp::Ne => self.bool_as_int(&lhs._eq(rhs).not()),
