@@ -152,13 +152,14 @@ impl PropertyChecker {
                             }
                         }
                     }
-                    // ForEach: the allocation stores pointers, but the invariant
-                    // applies to the pointee type. Unwrap *const/*mut to match.
-                    if property.for_each().is_some() {
-                        if let TyKind::RawPtr(inner, _) = elem_ty.kind() {
-                            if *inner == expected_ty {
-                                return CheckResult::ProvedByRule;
-                            }
+                    // The allocation stores pointers (`*mut T` / `*const T`) but
+                    // the `Typed` obligation is about the *pointee* (`T`): a
+                    // pointer loaded from such a container points at a `T`.
+                    // Applies both to `ForEach` (`buckets.iter()`) and to a single
+                    // pointer loaded from a container (`let cur = buckets[i]`).
+                    if let TyKind::RawPtr(inner, _) = elem_ty.kind() {
+                        if *inner == expected_ty {
+                            return CheckResult::ProvedByRule;
                         }
                     }
                     // Transmute to an all-bit-valid destination type

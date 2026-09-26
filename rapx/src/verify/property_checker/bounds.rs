@@ -107,10 +107,32 @@ impl PropertyChecker {
             if self.alloc_elem_is_array_of(alloc_elem_ty, req_ty) {
                 return CheckResult::ProvedByRule;
             }
+            // Cross-type generic fast-path (mirrors `check_allocated`): when the
+            // allocation element type and the required type are *different*
+            // generic params (e.g. `T` vs `U` in `slice::align_to`), the
+            // byte-level sizes are opaque and the reinterpretation is guaranteed
+            // compatible by Rust's type system (the caller's `#[requires]` /
+            // `from_raw_parts` contract establishes the bounds). Without this,
+            // `align_to`'s `from_raw_parts(mid, us_len)` cannot discharge
+            // `InBound` because `us_len` is a symbolic `lcm`/`gcd`-derived count.
+            // A *same-type* generic access (`T` vs `T`) must still fall through
+            // to the byte-range proof so a one-past-end deref stays `Failed`.
+            if alloc_elem_ty != req_ty
+                && matches!(
+                    (alloc_elem_ty.kind(), req_ty.kind()),
+                    (TyKind::Param(_), TyKind::Param(_))
+                )
+            {
+                return CheckResult::ProvedByRule;
+            }
         }
 
-        // External allocations have unbounded size.
-        if vm_state.alloc(alloc_id).is_external() {
+        // An external allocation whose size is the `i64::MAX` "unbounded"
+        // sentinel (a Vec/slice buffer, or a materialized `Allocated` fact)
+        // auto-passes any `InBound` access.  A *raw-pointer target* carries a
+        // symbolic "unknown" size instead, so its access falls through and must
+        // be proved (and otherwise fails).
+        if alloc.is_external() && size.simplify().as_u64() == Some(i64::MAX as u64) {
             return CheckResult::ProvedByRule;
         }
 

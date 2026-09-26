@@ -581,6 +581,8 @@ fn init_methods(tcx: TyCtxt) -> Methods {
             }
             if (name.contains("::get_unchecked") || name.contains("::get_unchecked_mut"))
                 && (name.contains("::<impl [T]>::get_unchecked")
+                    || name.contains("::<impl *mut [T]>::get_unchecked")
+                    || name.contains("::<impl *const [T]>::get_unchecked")
                     || name.contains("::mut_ptr::get_unchecked")
                     || name.contains("::const_ptr::get_unchecked"))
             {
@@ -1437,6 +1439,10 @@ intrinsics! {
         "std::ptr::const_ptr::<impl *const T>::cast_mut",
         "core::ptr::const_ptr::<impl *const T>::cast_mut"
     ],
+    const_ptr_cast_array: &[
+        "std::ptr::const_ptr::<impl *const T>::cast_array",
+        "core::ptr::const_ptr::<impl *const T>::cast_array"
+    ],
     const_ptr_slice_is_empty: &[
         "std::ptr::const_ptr::<impl *const [T]>::is_empty",
         "core::ptr::const_ptr::<impl *const [T]>::is_empty"
@@ -1464,6 +1470,10 @@ intrinsics! {
     mut_ptr_cast_const: &[
         "std::ptr::mut_ptr::<impl *mut T>::cast_const",
         "core::ptr::mut_ptr::<impl *mut T>::cast_const"
+    ],
+    mut_ptr_cast_array: &[
+        "std::ptr::mut_ptr::<impl *mut T>::cast_array",
+        "core::ptr::mut_ptr::<impl *mut T>::cast_array"
     ],
     mut_ptr_slice_is_empty: &[
         "std::ptr::mut_ptr::<impl *mut [T]>::is_empty",

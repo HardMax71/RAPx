@@ -51,6 +51,11 @@ ValidTraitObj(p: Ptr) { NonNull(p) }
 /// `size_of(T)`), otherwise `(end_or_len - ptr) / size_of(T)` elements.
 ZstAwareInBound(ptr: Ptr, T: Ty, end_or_len: Expr) { InBound(ptr, T, if size_of(T) == 0 { 0 } else { (end_or_len - ptr) / size_of(T) }) }
 
+/// `Init` with ZST-aware element counting (the slice-iterator counterpart of
+/// [`ZstAwareInBound`]): `0` elements when `T` is zero-sized, otherwise
+/// `(end_or_len - ptr) / size_of(T)` elements.
+ZstAwareInit(ptr: Ptr, T: Ty, end_or_len: Expr) { Init(ptr, T, if size_of(T) == 0 { 0 } else { (end_or_len - ptr) / size_of(T) }) }
+
 // ── Auto-trait (Send/Sync) type-level compounds ──
 
 /// A raw pointer field `ptr` that is `Allocated` and `Owning` (discharged by the

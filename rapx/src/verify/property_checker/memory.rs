@@ -259,7 +259,7 @@ impl PropertyChecker {
     pub(super) fn check_non_null<'ctx, 'tcx>(
         &self,
         vm_state: &VmState<'ctx, 'tcx>,
-        solver: &Solver<'ctx>,
+        _solver: &Solver<'ctx>,
         checkpoint: &Checkpoint<'tcx>,
         property: &Property<'tcx>,
     ) -> CheckResult {
@@ -280,8 +280,17 @@ impl PropertyChecker {
                 return CheckResult::ProvedByRule;
             }
         }
+        // For an external pointer, check nullability against the *path
+        // conditions* only.  `assert_all` also asserts every live value's
+        // derived `non_null` flag, but the `&T` produced by this very deref
+        // shares the source pointer's term and is marked non-null — using it
+        // would circularly "prove" `NonNull` on the pointer being dereferenced.
         let zero = Int::from_u64(vm_state.ctx, 0);
-        self.smt_check(solver, &value.term._eq(&zero))
+        let local = Solver::new(vm_state.ctx);
+        for cond in &vm_state.path_conditions {
+            local.assert(cond);
+        }
+        self.smt_check(&local, &value.term._eq(&zero))
     }
 
     pub(super) fn check_null<'ctx, 'tcx>(
@@ -484,7 +493,13 @@ impl PropertyChecker {
         let base = vm_state.allocation_base(alloc_id).clone();
         let size = vm_state.allocation_size(alloc_id).clone();
 
-        if vm_state.alloc(alloc_id).is_external() {
+        // An external allocation whose size is the `i64::MAX` "unbounded"
+        // sentinel (a Vec/slice buffer, or a materialized `Allocated` fact)
+        // auto-passes any `Allocated` access.  A *raw-pointer target* carries a
+        // symbolic "unknown" size instead, so its access falls through and must
+        // be proved (and otherwise fails).
+        if vm_state.alloc(alloc_id).is_external() && size.simplify().as_u64() == Some(i64::MAX as u64)
+        {
             return CheckResult::ProvedByRule;
         }
 

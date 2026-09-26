@@ -5,6 +5,9 @@
 use std::marker::PhantomData;
 
 #[rapx::invariant(NonNull(ptr))]
+#[rapx::invariant(Allocated(ptr, u32, 1))]
+#[rapx::invariant(InBound(ptr, u32, 1))]
+#[rapx::invariant(Align(ptr, u32))]
 #[rapx::invariant(Init(ptr, u32, 1))]
 #[rapx::invariant(Alive(ptr, 'a))]
 pub struct PrivateSlot<'a> {

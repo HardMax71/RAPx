@@ -662,6 +662,57 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                                             },
                                         },
                                     );
+                                } else if let rustc_middle::ty::TyKind::Adt(adt, substs) =
+                                    field_ty.kind()
+                                {
+                                    // A heap-backed smart-pointer field (`Box<[T]>`,
+                                    // `Vec<T>`) inside a referenced struct: materialize
+                                    // the pointee allocation so field access (e.g.
+                                    // `self.buckets.iter()`) resolves to the *data*
+                                    // elements, not the whole struct. Mirrors the
+                                    // Box/Vec parameter materialization in
+                                    // `init_parameters`.
+                                    if api_classify::is_std_box(adt.did())
+                                        || api_classify::is_std_vec(adt.did())
+                                    {
+                                        if let Some(pointee) =
+                                            substs.first().and_then(|s| s.as_type())
+                                        {
+                                            let elem_ty = match pointee.kind() {
+                                                rustc_middle::ty::TyKind::Slice(e) => *e,
+                                                _ => pointee,
+                                            };
+                                            let elem_align = self.align_sym(elem_ty);
+                                            let max_size =
+                                                Int::from_u64(self.ctx, i64::MAX as u64);
+                                            let (data_alloc_id, data_base) =
+                                                self.allocate_external(
+                                                    max_size,
+                                                    elem_align,
+                                                    Some(elem_ty),
+                                                );
+                                            self.alloc_mut(data_alloc_id).initialized = true;
+                                            self.set_field_value(
+                                                local,
+                                                vec![idx],
+                                                VmValue {
+                                                    term: data_base,
+                                                    ty: field_ty,
+                                                    provenance: Some(Provenance {
+                                                        alloc_id: data_alloc_id,
+                                                        offset: Int::from_u64(self.ctx, 0),
+                                                        is_field_offset: false,
+                                                        element_offset: None,
+                                                    }),
+                                                    invariants: ValueInvariants {
+                                                        non_null: true,
+                                                        init: true,
+                                                        ..Default::default()
+                                                    },
+                                                },
+                                            );
+                                        }
+                                    }
                                 } else if matches!(
                                     field_ty.kind(),
                                     rustc_middle::ty::TyKind::Uint(_)
@@ -997,11 +1048,25 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 },
             );
         } else {
-            let field_align = self.align_sym(pointee);
-            let max_size = Int::from_u64(self.ctx, i64::MAX as u64);
+            // A raw pointer carries no alignment or size guarantee for its
+            // target, so the external allocation is created with alignment 1 and
+            // a *symbolic* (unknown) size.  A `NonNull`/`Box` pointee, by
+            // contrast, is genuinely aligned and keeps the concrete `i64::MAX`
+            // "unbounded" size.
+            let field_align = if is_raw_ptr {
+                Int::from_u64(self.ctx, 1)
+            } else {
+                self.align_sym(pointee)
+            };
+            let max_size = if is_raw_ptr {
+                let s = self.fresh_int("raw_target_size");
+                self.path_conditions.push(s.ge(&Int::from_u64(self.ctx, 0)));
+                s
+            } else {
+                Int::from_u64(self.ctx, i64::MAX as u64)
+            };
             let (field_alloc_id, field_base) =
                 self.allocate_external(max_size, field_align, Some(pointee));
-            self.alloc_mut(field_alloc_id).initialized = true;
             elem_alloc.insert(pointee, (field_alloc_id, field_base.clone()));
             // Decompose the pointee's own fields into per-allocation tracking
             // so `(*ptr).field` derefs resolve to the field value (not the raw
@@ -2375,6 +2440,25 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                 let term = crate::helpers::mir_utils::extract_local(operand)
                     .and_then(|l| self.field_value(l, &[0]).map(|v| v.term.clone()))
                     .unwrap_or(src_val.term);
+                // A pointer→integer cast (`ptr as usize`) yields the (always
+                // non-negative) address. Record this as a *path condition* so
+                // downstream pointer arithmetic (e.g. `align_up` in a free-list
+                // allocator) can discharge `NonNull` on the derived pointer —
+                // `check_non_null`'s SMT query only sees path conditions, not
+                // the `term >= 0` constraint `assert_value_constraints` adds.
+                let src_is_ptr = matches!(src_ty.kind(), rustc_middle::ty::TyKind::RawPtr(..)
+                    | rustc_middle::ty::TyKind::Ref(..));
+                let dest_is_int = matches!(
+                    cast_ty.kind(),
+                    rustc_middle::ty::TyKind::Uint(_) | rustc_middle::ty::TyKind::Int(_)
+                );
+                if src_is_ptr && dest_is_int {
+                    let zero = Int::from_u64(self.ctx, 0);
+                    self.path_conditions.push(term.ge(&zero));
+                    if src_val.invariants.non_null {
+                        self.path_conditions.push(term._eq(&zero).not());
+                    }
+                }
                 VmValue {
                     term,
                     ty: *cast_ty,
@@ -3404,17 +3488,46 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
         if contains_hazard(property) {
             self.contract_flags.alias_hazard_accepted = true;
         }
-        let Property::Atom(atom) = property else {
-            return;
-        };
-        if atom.contract_kind == ContractKind::Hazard {
-            return;
-        }
-        // Assert the atom's own effect, then each of its transitive
-        // consequences exactly once (`subsumption_closure` is deduplicated).
-        self.assert_atom_direct(property);
-        for sub in crate::verify::contract::compound::subsumption_closure(atom) {
-            self.assert_atom_direct(&Property::Atom(sub));
+        match property {
+            Property::Atom(atom) => {
+                if atom.contract_kind == ContractKind::Hazard {
+                    return;
+                }
+                // Assert the atom's own effect, then each of its transitive
+                // consequences exactly once (`subsumption_closure` is
+                // deduplicated).
+                self.assert_atom_direct(property);
+                for sub in crate::verify::contract::compound::subsumption_closure(atom) {
+                    self.assert_atom_direct(&Property::Atom(sub));
+                }
+            }
+            Property::And(and) => {
+                for conj in &and.conjuncts {
+                    self.assert_contract_fact(conj);
+                }
+            }
+            Property::Or(or) => {
+                // Two guard patterns are materialized by asserting the
+                // *non-guard* disjuncts (the guard is vacuous for the case the
+                // deref actually runs in):
+                //   `any(Null(p), (atoms…))`  — nullable pointer.
+                //   `Size(T, 0) || Deref`     — ZST vs non-ZST (`ValidPtr`).
+                // A general `Or` without such a guard disjunct is left to the
+                // checker (only one disjunct holds, so no fact is sound to
+                // assert unconditionally).
+                let is_guard = |d: &Box<Property<'tcx>>| {
+                    matches!(d.as_ref(), Property::Atom(a) if a.kind == PropertyKind::Null || a.kind == PropertyKind::Size)
+                };
+                if !or.disjuncts.iter().any(|d| is_guard(d)) {
+                    return;
+                }
+                for disj in &or.disjuncts {
+                    if is_guard(disj) {
+                        continue;
+                    }
+                    self.assert_contract_fact(disj);
+                }
+            }
         }
     }
 
@@ -3460,6 +3573,14 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                     self.contract_flags.has_checked_bounds = true;
                 } else {
                     self.assert_in_bound_single(property);
+                }
+                // The pointer-and-count form `InBound(p, T, n)` also guarantees
+                // the allocation backs `n` elements — materialize that size so a
+                // downstream `ptr.add(n)`/`ptr.sub(n)` can discharge `InBound`
+                // against a concrete (or `i64::MAX`) size rather than the coarse
+                // `in_bounds` flag (which only covers `count == 1`).
+                if property.args().len() >= 3 {
+                    self.assert_allocated_fact(property);
                 }
             }
             PropertyKind::Allocated => {
@@ -3703,19 +3824,44 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                         return;
                     };
                     if let Some(alloc_id) = val.provenance_alloc_id() {
+                        // Already has a *known* (concrete) size — a preceding
+                        // `Allocated`/`InBound` fact just materialized it.  Only
+                        // mark it live; re-materializing would orphan an `Align`
+                        // path condition recorded against the earlier term.
+                        if self.alloc(alloc_id).size.as_u64().is_some() {
+                            self.alloc_mut(alloc_id).dead = false;
+                            return;
+                        }
                         self.alloc_mut(alloc_id).dead = false;
                     }
-                    let v = self.materialize_external_alloc(elem_ty, count_term, val.ty, true);
+                    let mut v = self.materialize_external_alloc(elem_ty, count_term, val.ty, true);
+                    // The size materialization must not clobber a *stronger*
+                    // alignment fact already on the field (e.g. `Align(ptr,
+                    // usize)` set `align_n = 8`, but `Allocated(ptr, u8, n)`
+                    // re-materializes with `u8`'s align of 1 → `align_n = None`).
+                    if v.invariants.align_n.is_none() {
+                        v.invariants.align_n = val.invariants.align_n.clone();
+                    }
                     self.set_field_value(local, field_path, v);
                 } else {
-                    let Some(val) = self.locals.get(&local).cloned() else {
+                    // Wrapped field / pointer-to-ADT: materialize the *field*
+                    // target (not the whole local) so a downstream `Allocated`
+                    // on the field sees the freshly-sized allocation.
+                    let Some(val) = self.field_value(local, &field_path).cloned() else {
                         return;
                     };
                     if let Some(alloc_id) = val.provenance_alloc_id() {
+                        if self.alloc(alloc_id).size.as_u64().is_some() {
+                            self.alloc_mut(alloc_id).dead = false;
+                            return;
+                        }
                         self.alloc_mut(alloc_id).dead = false;
                     }
-                    let v = self.materialize_external_alloc(elem_ty, count_term, val.ty, false);
-                    self.set_local(local, v);
+                    let mut v = self.materialize_external_alloc(elem_ty, count_term, val.ty, false);
+                    if v.invariants.align_n.is_none() {
+                        v.invariants.align_n = val.invariants.align_n.clone();
+                    }
+                    self.set_field_value(local, field_path, v);
                 }
             }
         }

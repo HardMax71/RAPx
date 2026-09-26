@@ -97,8 +97,10 @@ pub fn is_as_ptr(callee: Option<DefId>) -> bool {
             crate::def_id::rc_as_ptr(),
             crate::def_id::const_ptr_cast(),
             crate::def_id::const_ptr_cast_mut(),
+            crate::def_id::const_ptr_cast_array(),
             crate::def_id::mut_ptr_cast(),
             crate::def_id::mut_ptr_cast_const(),
+            crate::def_id::mut_ptr_cast_array(),
             crate::def_id::nonnull_cast(),
             crate::def_id::box_into_raw(),
             crate::def_id::cstring_into_raw(),
@@ -120,8 +122,10 @@ pub(crate) fn is_raw_ptr_cast(callee: Option<DefId>) -> bool {
         &[
             crate::def_id::const_ptr_cast(),
             crate::def_id::const_ptr_cast_mut(),
+            crate::def_id::const_ptr_cast_array(),
             crate::def_id::mut_ptr_cast(),
             crate::def_id::mut_ptr_cast_const(),
+            crate::def_id::mut_ptr_cast_array(),
         ],
     )
 }

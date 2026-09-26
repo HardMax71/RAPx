@@ -294,23 +294,38 @@ fn alias_unsound_21() {
     assert_unproved_exclusive_with_result(
         &output,
         "unsound_independent_mut_ptr_aliases_shared",
-        &["Alias", "NonNull"],
+        &["Alias", "NonNull", "InBound"],
         "UNSOUND",
     );
 }
 
-// A raw-pointer struct field carries no `NonNull`/`Init` guarantee: the
-// `Alias` hazard is joined by the unproved `Init` (and `NonNull`) obligations.
+// The raw-pointer deref has a `Ptr2Ref` obligation; its memory-shape parts
+// (`NonNull`/`Allocated`/`InBound`/`Align`/`Init`) are discharged by the
+// struct's explicit `#[rapx::invariant]`s, leaving only the `Alias` hazard
+// unproved.
 #[test]
 fn alias_unsound_25() {
     let output = run_with_args("verify_units/alias_unsound_25", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "Node::next_mut", &["Alias", "Init"]);
+    assert_unproved_exclusive(&output, "Node::next_mut", &["Alias"]);
 }
 
 #[test]
 fn alias_unsound_26() {
     let output = run_with_args("verify_units/alias_unsound_26", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "Node::get_next", &["Alias", "Init"]);
+    assert_unproved_exclusive(&output, "Node::get_next", &["Alias"]);
+}
+
+// An unannotated raw-pointer field cannot discharge any of its `Ptr2Ref`
+// memory-shape obligations: `NonNull`/`Allocated`/`InBound`/`Align`/`Init` all
+// fail, alongside the `Alias` hazard.
+#[test]
+fn alias_unsound_30() {
+    let output = run_with_args("verify_units/alias_unsound_30", CMD_VERIFY_TARGETED);
+    assert_unproved_exclusive(
+        &output,
+        "Node::next_ref",
+        &["NonNull", "Allocated", "InBound", "Align", "Init", "Alias"],
+    );
 }
 
 // ================ NonOverlap Sound Cases =============
@@ -560,7 +575,7 @@ fn alive_unsound_01() {
     assert_unproved_exclusive(
         &output,
         "DangerousAliaser::<'a, T>::get_mut",
-        &["Alive", "NonNull", "ValidPtr"],
+        &["Alive", "NonNull", "ValidPtr", "Align"],
     );
 }
 
@@ -702,7 +717,7 @@ fn alias_unsound_02() {
 #[test]
 fn alias_unsound_20() {
     let output = run_with_args("verify_units/alias_unsound_20", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive_with_result(&output, "as_bytes_mut_ptr_len_missing_alias", &["Alias", "ValidNum", "Allocated"], "UNSOUND");
+    assert_unproved_exclusive_with_result(&output, "as_bytes_mut_ptr_len_missing_alias", &["Alias", "ValidNum", "ValidPtr"], "UNSOUND");
 }
 
 // `&*p` on a one-past-end pointer: the raw-ptr-deref checkpoint checks
@@ -737,7 +752,7 @@ fn alias_unsound_28() {
     assert_unproved_exclusive_with_result(
         &output,
         "shared_then_mut",
-        &["Alias", "Init"],
+        &["Alias", "Init", "NonNull", "InBound"],
         "UNSOUND",
     );
 }
@@ -758,7 +773,7 @@ fn alias_unsound_05() {
 #[test]
 fn alias_unsound_06() {
     let output = run_with_args("verify_units/alias_unsound_06", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "RawSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "RawSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 #[test]
@@ -778,31 +793,31 @@ fn nonoverlap_unsound_01() {
 #[test]
 fn alias_unsound_11() {
     let output = run_with_args("verify_units/alias_unsound_11", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "PublicRawSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "PublicRawSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 #[test]
 fn alias_unsound_12() {
     let output = run_with_args("verify_units/alias_unsound_12", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "GetterSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "GetterSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 #[test]
 fn alias_unsound_13() {
     let output = run_with_args("verify_units/alias_unsound_13", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "WriterSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "WriterSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 #[test]
 fn alias_unsound_14() {
     let output = run_with_args("verify_units/alias_unsound_14", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "SplitSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "SplitSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 #[test]
 fn alias_unsound_17() {
     let output = run_with_args("verify_units/alias_unsound_17", CMD_VERIFY_TARGETED);
-    assert_unproved_exclusive(&output, "TraitSlot::as_slice_mut", &["Alias", "Alive", "Init", "NonNull", "ValidPtr"]);
+    assert_unproved_exclusive(&output, "TraitSlot::as_slice_mut", &["Alias", "Alive", "NonNull", "ValidPtr", "Align"]);
 }
 
 // ================ Module/Crate Filter Tests =============
