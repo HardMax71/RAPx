@@ -3673,6 +3673,15 @@ impl<'ctx, 'tcx> VmState<'ctx, 'tcx> {
                                 None
                             }
                         }) {
+                            // A `Typed(container.iter(), T)` *for_each* invariant
+                            // declares that the container's pointer elements all
+                            // point at valid `T`s. Record that target type so a
+                            // single pointer loaded from the container can later
+                            // discharge `Typed(ptr, T)` soundly (the fact comes
+                            // from the invariant, not from the pointer type).
+                            if property.for_each().is_some() {
+                                self.alloc_mut(alloc_id).for_each_target_ty = Some(expected_ty);
+                            }
                             // Only record the type invariant when the allocation
                             // has no element type yet.  `Init ⇒ Typed` (and other
                             // typed preconditions) may re-assert `Typed` with a

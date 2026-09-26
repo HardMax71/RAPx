@@ -152,13 +152,23 @@ impl PropertyChecker {
                             }
                         }
                     }
-                    // The allocation stores pointers (`*mut T` / `*const T`) but
-                    // the `Typed` obligation is about the *pointee* (`T`): a
-                    // pointer loaded from such a container points at a `T`.
-                    // Applies both to `ForEach` (`buckets.iter()`) and to a single
-                    // pointer loaded from a container (`let cur = buckets[i]`).
-                    if let TyKind::RawPtr(inner, _) = elem_ty.kind() {
-                        if *inner == expected_ty {
+                    // ForEach (`buckets.iter()`): the allocation stores pointers
+                    // (`*mut T`), but the invariant applies to the pointee (`T`).
+                    // Unwrap *const/*mut to match.
+                    if property.for_each().is_some() {
+                        if let TyKind::RawPtr(inner, _) = elem_ty.kind() {
+                            if *inner == expected_ty {
+                                return CheckResult::ProvedByRule;
+                            }
+                        }
+                    }
+                    // A single pointer loaded from a container whose
+                    // `Typed(container.iter(), T)` invariant established the
+                    // element target type (`let cur = buckets[i]`). The fact comes
+                    // from the invariant, so this does not bless dangling pointers
+                    // in containers that carry no such invariant.
+                    if let Some(target) = vm_state.alloc(alloc_id).for_each_target_ty {
+                        if target == expected_ty {
                             return CheckResult::ProvedByRule;
                         }
                     }

@@ -452,15 +452,21 @@ pub(crate) fn check_alias_vm<'ctx, 'tcx>(
                     .unwrap_or(rustc_middle::mir::Local::from_usize(1));
                 let (root, fields) = tree.resolve_local_to_root(local);
                 if !fields.is_empty() {
-                    // A raw-pointer field of a *by-value* `self` (moved into the
-                    // method, e.g. `fn last(mut self)`) is exclusively owned by
-                    // this call, so re-borrowing it (`&mut *self.v`) cannot alias
-                    // any live reference. A `&`/`&mut self` is handled by the
-                    // shared/mut-ref origin paths above.
+                    // A raw-pointer field of a *by-value* `self` is exclusively
+                    // owned by this call only when the `self` was *moved* (not
+                    // copied), so re-borrowing it (`&mut *self.v`) cannot alias
+                    // any live reference. A `Copy` by-value `self` is copied —
+                    // the caller's copy still aliases the raw target — so it
+                    // must not be treated as exclusive. A `&`/`&mut self` is
+                    // handled by the shared/mut-ref origin paths above.
                     let root_ty =
                         vm_state.body.local_decls[rustc_middle::mir::Local::from_usize(root)].ty;
                     if !matches!(root_ty.kind(), rustc_middle::ty::TyKind::Ref(..)) {
-                        return VmAliasResult::Proved;
+                        let typing_env =
+                            rustc_middle::ty::TypingEnv::post_analysis(tcx, caller);
+                        if !tcx.type_is_copy_modulo_regions(typing_env, root_ty) {
+                            return VmAliasResult::Proved;
+                        }
                     }
                     let resolved = PlaceKey::from_origin(root, fields);
                     let sfo = alias_hazard::self_field_origin(tcx, caller, &resolved);

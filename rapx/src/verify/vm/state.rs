@@ -201,6 +201,14 @@ pub(crate) struct Allocation<'ctx, 'tcx> {
     /// Slice data allocation: for a `&[T]` reference's stack allocation, the
     /// symbolic data allocation created for the slice contents.
     pub slice_data: Option<AllocId>,
+
+    /// The pointee type established by a `Typed(container.iter(), T)` *for_each*
+    /// invariant: the container's elements are pointers, and every one of them
+    /// points at a valid `T`. Lets a single pointer loaded from the container
+    /// (`let cur = buckets[i]`) discharge `Typed(cur, T)` without trusting the
+    /// pointer type alone (which would also bless dangling pointers in
+    /// containers that carry no such invariant).
+    pub for_each_target_ty: Option<Ty<'tcx>>,
 }
 
 impl<'ctx, 'tcx> Allocation<'ctx, 'tcx> {
@@ -225,6 +233,7 @@ impl<'ctx, 'tcx> Allocation<'ctx, 'tcx> {
             nul_terminated: false,
             parent: None,
             slice_data: None,
+            for_each_target_ty: None,
         }
     }
 
