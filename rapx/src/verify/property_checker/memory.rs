@@ -897,7 +897,7 @@ impl PropertyChecker {
         // call) shares the allocation's provenance and reads back as `MutRef`.
         // A raw pointer / `NonNull` carries no liveness guarantee, so `Alive`
         // must be justified by an explicit assumption (an `Alive` precondition /
-        // struct invariant, materialized as `alive_assumed`) or by provenance
+        // struct invariant, materialized as `liveness`) or by provenance
         // shared with a live reference parameter.
         let is_raw_ptr = matches!(value.ty.kind(), TyKind::RawPtr(..))
             || matches!(value.ty.kind(), TyKind::Adt(adt_def, _)

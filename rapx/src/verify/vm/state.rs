@@ -171,7 +171,8 @@ pub(crate) enum Liveness<'tcx> {
     AssumedFor(Region<'tcx>),
 }
 
-/// A memory allocation (stack or heap).
+/// A memory allocation: a stack local, a heap object (`Box`/`Vec`), or an
+/// external raw-pointer placeholder.
 ///
 /// The allocation is stored in `VmState::allocations` at index `AllocId.0`
 /// (an `AllocId` is a monotonic counter that doubles as the vector index).
@@ -193,41 +194,50 @@ pub(crate) struct Allocation<'ctx, 'tcx> {
     /// The allocation shape (object vs slice vs external).
     pub kind: AllocKind<'ctx>,
 
-    /// Allocations that have been freed (StorageDead, Drop).
+    /// Whether the allocation has been freed (StorageDead / Drop).
     pub dead: bool,
 
-    /// Allocations whose contents hold an initialized (readable) value: a heap
-    /// constructor (`Box::new`, `Vec`), a reference parameter's referent, a
-    /// callee return, or a `write`. Stays `false` for uninitialized memory
-    /// (`Box::new_uninit`, `MaybeUninit::uninit`).
+    /// Whether the allocation's contents hold an initialized (readable) value:
+    /// a heap constructor (`Box::new`, `Vec`), a reference parameter's referent,
+    /// a callee return, a `write`, `ValidCStr`, or const/static byte data.
+    /// Stays `false` for uninitialized memory (`Box::new_uninit`,
+    /// `MaybeUninit::uninit`).
     pub initialized: bool,
 
     /// How this allocation's liveness is established, and for which region.
-    /// Only consulted for external allocations, whose liveness `dead` cannot
-    /// track; `AssumedFor('a)` records the `Alive(p, 'a)` contract's region so
-    /// the checker can reject a use that demands a longer region.
+    /// Only consulted for external allocations, which carry no liveness
+    /// guarantee (their memory is owned by the caller); `AssumedFor('a)` records
+    /// the `Alive(p, 'a)` contract's region so the checker can reject a use that
+    /// demands a longer region.
     pub liveness: Liveness<'tcx>,
 
-    /// Allocations known to be a null-terminated byte buffer (a valid C
-    /// string), asserted via a `ValidCStr` contract fact or struct invariant.
+    /// Whether the allocation is known to be a null-terminated byte buffer (a
+    /// valid C string), asserted via a `ValidCStr` contract fact or struct
+    /// invariant.
     pub nul_terminated: bool,
 
-    /// Parent allocation for sub-allocations created by split_at / from_raw_parts.
-    /// The sub-view has its own fresh `base`; the address linkage back to the
-    /// parent lives in the pointer term (`parent_term + offset`) and provenance
-    /// `offset`, not in base arithmetic. `root_alloc` follows this edge.
+    /// The allocation a sub-view was derived from: a slice view created by
+    /// `s[i..j]` / `s.get(range)`, `split_at` / `align_to` / `as_chunks`, or
+    /// `from_raw_parts`. Each view is a fresh `AllocId` but a window onto the
+    /// same memory as its source, so `root_alloc` follows this edge to group
+    /// aliasing views. The address linkage back to the source lives in the
+    /// pointer term (`parent_term + offset`) and provenance `offset`, not in
+    /// base arithmetic.
     pub parent: Option<AllocId>,
 
-    /// Slice data allocation: for a `&[T]` reference's stack allocation, the
-    /// symbolic data allocation created for the slice contents.
+    /// The *data* allocation of a two-part value, reached from the *header*
+    /// allocation whose provenance the value carries. A `Vec`/`String`/`CString`
+    /// value's provenance names its struct's stack slot, not the heap buffer it
+    /// owns, so `as_ptr()`/`into_boxed_slice`/`drop`/mutation follow this edge
+    /// to the buffer. A `&[T]` fat pointer's provenance already names the slice
+    /// data, so this is redundant there.
     pub slice_data: Option<AllocId>,
 
-    /// The pointee type established by a `Typed(container.iter(), T)` *for_each*
-    /// invariant: the container's elements are pointers, and every one of them
-    /// points at a valid `T`. Lets a single pointer loaded from the container
-    /// (`let cur = buckets[i]`) discharge `Typed(cur, T)` without trusting the
-    /// pointer type alone (which would also bless dangling pointers in
-    /// containers that carry no such invariant).
+    /// The target type declared by a `Typed(container.iter(), T)` *for_each*
+    /// invariant: every pointer element of the container points at a valid `T`,
+    /// so a single pointer loaded from it (`let cur = buckets[i]`) discharges
+    /// `Typed(cur, T)` — without trusting the pointer type alone, which would
+    /// also bless dangling pointers in containers carrying no such invariant.
     pub for_each_target_ty: Option<Ty<'tcx>>,
 }
 
